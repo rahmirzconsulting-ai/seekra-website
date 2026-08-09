@@ -1,0 +1,323 @@
+| P R O J | E C T   H | A N D O F | F   D O C | U M E N T |
+| ------- | --------- | --------- | --------- | --------- |
+Seekra Marketing Website
+Complete Project Brief, Design System & Ready-to-Use AI Build Prompt
+Seekra — Content-Aware Intelligence for the Enterprise
+Prepared for external website development  ·  August 2026
+
+Contents
+1. Project Overview · p. 3
+2. The Product: What Seekra Does · p. 3
+3. Target Audience & Markets · p. 4
+4. Brand Design System · p. 5
+5. Website Structure & Content Requirements · p. 6
+6. Media & Asset Plan · p. 7
+7. Technical Requirements & Constraints · p. 8
+8. Competitive Positioning · p. 8
+9. Copy Deck (Approved Messaging) · p. 9
+10. The AI Build Prompt (Copy-Paste Ready) · p. 9
+11. Acceptance Checklist · p. 11
+
+1. Project Overview
+1. Project Overview
+Project name: Seekra marketing website (the public "product face").
+Objective: Design and build a modern, corporate, professional single-page marketing website for Seekra, a
+self-hosted, content-aware AI document intelligence platform. The site will be the primary marketing asset
+for two target markets: the Gulf region (enterprise/government buyers who care about data sovereignty) and
+Pakistan (enterprises and organizations needing bilingual English/Urdu/Arabic document AI).
+Design ambition: An Apple.com-class scrolling experience — cinematic, spacious, confident — without
+copying Apple. The page should keep visitors engaged as they scroll: a strong animated hero, alternating
+dark and light chapters, subtle scroll-reveal motion, and honest product storytelling.
+Deliverable expected from the build: A production-ready responsive website (desktop + mobile), English
+first (Arabic version planned later), deployable as static files.
+Hosting plan (context for the builder): The marketing site will live at the domain root seekra.pk; the
+actual web application will move to app.seekra.pk. The site must therefore work at a domain root and
+keep the "Launch App / Book a Demo" links configurable.
+2. The Product: What Seekra Does
+Seekra is a Content-Aware Intelligence platform: organizations upload their documents, and Seekra lets
+staff ask questions, search by image, and even talk to their archive — with answers grounded in the
+organization's own files and cited back to the exact source page. It is fully self-hosted: nothing leaves the
+customer's infrastructure.
+2.1 Core capabilities (the story the site must tell)
+Table 1 Seekra capability pillars
+Pillar What it does Why it matters to buyers
+Ask (Conversational Chat with the entire document archive in natural Answers are verifiable in one
+Q&A) language. Every answer carries numbered citation click — no blind trust in AI
+markers that deep-link to the exact source document output. Critical for compliance-
+and page, opening the built-in document viewer at that driven buyers.
+page.
+3
+
+3. Target Audience & Markets
+See (Visual Upload a photo or scanned image; Seekra finds visually Field inspections, damage photos,
+search) similar items across the archive using image embeddings, site images — searchable without
+shows similarity scores and detected-content labels, and any text. A differentiator almost
+describes what the image most likely shows and which no competitor has.
+documents it relates to.
+Speak (Voice, Full voice interaction: speech-to-text in, spoken answers Built for the Gulf and Pakistani
+Arabic-first) out. Arabic is a first-class citizen (including RTL rendering markets where Arabic/Urdu
+and Arabic-capable fonts), alongside English and Urdu. support in enterprise AI is rare
+and shallow.
+Trust (Security Self-hosted on the customer's own servers (cloud VM or air- Data never leaves the box — the
+& sovereignty) gapped on-prem). PII is automatically detected and masked decisive argument for
+before any text reaches an LLM. Role-based access control, government, legal, healthcare, and
+full audit logging. financial buyers.
+Read (Built-in Word, Excel, PowerPoint and PDF files open in an in- One workspace; no "download
+Office viewing) browser viewer — no desktop Office install needed, and and open locally" friction.
+citations open straight into the viewer at the cited page.
+2.2 Key differentiators (honest claims only)
+100% self-hosted — runs on the customer's infrastructure, including fully air-gapped deployments.
+PII masking before the LLM — names, ID numbers, emails, and phone numbers are redacted upstream
+of any language model call.
+Cited answers with page-level deep links — every claim in an answer links to its source page.
+True multimodal search — text, image, and voice in one system.
+Arabic/Urdu/English parity — not a translated afterthought.
+Do not fabricate customer names, logos, statistics, or testimonials anywhere on the site. If proof points
+are needed, use capability statements only.
+3. Target Audience & Markets
+Table 2 Audience profile
+Segment Profile Message emphasis
+Gulf enterprises & CTOs, CIOs, compliance and digital-transformation Data sovereignty, air-gap
+government leads in KSA/UAE/Qatar. Regulated sectors: readiness, Arabic-first voice
+government, legal, finance, healthcare, energy. and UI, audit trails.
+4
+
+4. Brand Design System
+Pakistani Banks, law firms, industrial groups, public Bilingual parity, visual search for field
+enterprises sector. Mixed English/Urdu document estates. operations, on-prem deployment, no per-seat
+SaaS lock-in.
+Primary call to action: Book a Demo (contact form + email). Secondary: learn the capabilities by scrolling.
+No pricing is published — pricing is discussed in person.
+Tone of voice: Corporate and professional; confident but never hyped; short declarative sentences; no
+buzzword stuffing ("revolutionary", "game-changing", "supercharge" are banned).
+4. Brand Design System
+The website must use the same color identity as the Seekra application. These are the exact brand shades —
+do not substitute them:
+Table 3 Official brand palette (mandatory)
+Swatch Hex Name Usage
+#3D2B1D Dark brown Primary brand color: headings, key surfaces,
+gradients, section anchors.
+#B59876 Tan / sand accent Primary accent: CTAs, links, highlights, citation
+chips, glows, icon strokes.
+#E7E6E4 Cream (light) Light section backgrounds; body text on dark
+surfaces.
+#D8D6D3 Warm gray Secondary light backgrounds, borders, muted text
+on dark.
+#202020 Charcoal Dark section base (hero, security, contact, footer).
+#B93C32 Brick red Sparing accent only: a period in a headline, "not
+supported" marks in comparison tables. Never a
+background.
+4.1 Typography
+Primary typeface: Inter (self-hosted variable font preferred) — clean, corporate, excellent screen
+rendering.
+Display headings: 600–650 weight, tight letter-spacing (-0.02em to -0.03em), large scale (Apple-like
+restraint: one big idea per screen).
+Body: 400–450 weight, comfortable line-height (~1.6).
+5
+
+5. Website Structure & Content Requirements
+Arabic text (used in small accent chips such as "ودرا · ﺔﻴﺑﺮﻌﻟا · English") must render with proper
+shaping; include a Nastaliq/Naskh-capable font fallback for Urdu/Arabic snippets.
+4.2 Visual language rules
+Backgrounds are solid. No grid-line patterns, no square-box textures, no busy tech patterns. Depth
+comes from soft radial glows (tan on charcoal/brown) and generous whitespace.
+Rhythm: alternate dark and light chapters as the visitor scrolls (dark hero → light problem/capabilities
+→ dark security wall → light comparison/deployment → dark contact/footer).
+Motion: subtle scroll-reveal (fade + slight rise, staggered), slow crossfade/Ken-Burns on hero visuals.
+Motion must be calm — no parallax gimmicks, no autoplaying sound.
+Product visuals in browser-frame mockups: UI screenshots/videos sit inside a minimal browser-
+chrome frame (three dots + URL pill showing app.seekra.pk) with soft tan-tinted shadows.
+Corner radius: moderate (10–16px on cards/frames); no heavy shadows; borders hairline (rgba cream
+at 8–12% on dark, gray on light).
+Icons: thin-stroke line icons only (lucide-style), tan or currentColor.
+5. Website Structure & Content Requirements
+A single-page site with anchored sections, in this order:
+Table 4 Page structure (top to bottom)
+# Section Theme Content requirements
+1 Navbar dark, fixed Tan logo mark + "Seekra" wordmark; links: Capabilities, Security,
+Deployment, Contact; right-side tan pill button "Book a Demo".
+Transparent at top, frosted dark (#202020 at ~85% + blur) after scroll.
+2 Hero dark Not a wall of solid text. An animated product showcase plays inside a
+browser frame (auto-crossfading slideshow of 4 scenes: Ask / See /
+Speak / Trust, ~5s each, slow zoom, caption pill, progress dots).
+Compact one-line headline above: "Your documents finally answer
+back." (tan accent + red period). Floating glass chips around the frame:
+"Cited answers", "ودرا · ﺔﻴﺑﺮﻌﻟا · English", "100% visual match", "Air-
+gapped ready". Two CTAs: "Book a Demo" (tan, primary) and "See how
+it works" (ghost).
+3 Problem light Three pain cards: (a) knowledge is buried in files nobody can search; (b)
+cloud AI means your data leaves the building; (c) answers without
+sources can't be trusted. Empathetic, specific, corporate tone.
+6
+
+6. Media & Asset Plan
+4 Capabilities light Three chapters — Ask, See, Speak — each: headline, 3–4 concrete benefit
+(alternating) bullets, and a browser-frame product visual (screenshot/video/animated mock).
+Alternate left/right layout per chapter.
+5 Security dark Headline: "Nothing leaves the box." (red period). Four cards: Self-hosted & air-
+wall gap ready; PII masked before the LLM; Role-based access control; Full audit
+logging. This section is the emotional climax for Gulf buyers — give it weight.
+6 Comparison light Honest table: Seekra vs. typical Cloud AI assistants — rows: data residency, air-
+gap option, PII pre-masking, page-level citations, visual/image search,
+Arabic/Urdu voice, offline operation. Tan check marks for Seekra; red ✗ or
+"Partial" pills for cloud AI, with a fair footnote (cloud tools are strong for general
+tasks; the comparison concerns enterprise data handling).
+7 Deployment light Three cards: Cloud VM (customer's AWS/Azure), On-premises, Air-gapped /
+offline — the featured option styled as a dark #202020 card. No pricing shown
+anywhere.
+8 Contact dark Simple form (name, organization, email, message) submitting to
+rahmirz.consulting@gmail.com via a form backend (e.g., FormSubmit AJAX)
+with a mailto: fallback. Show the email address visibly as well. No
+phone/WhatsApp.
+9 Footer dark Logo, one-line tagline, section anchors, email, "© 2026 Seekra". Minimal.
+5.1 Interaction requirements
+Scroll-reveal animations via IntersectionObserver (fade/translate, staggered); must include a ~2.5s
+fallback so content is never hidden if observers fail.
+Hero slideshow: pure JS/CSS crossfade; pause on user interaction is a plus; must not autoplay audio.
+All anchor navigation smooth-scrolls; navbar collapses to a hamburger on mobile.
+Fully responsive: desktop, tablet, mobile (the hero showcase must stack cleanly below the headline on
+small screens).
+6. Media & Asset Plan
+Table 5 Assets
+Asset Status Notes
+Hero showcase visuals (4 Available Four AI-generated 16:9 branded scenes (chat, visual search, voice,
+scenes) security) exist and will be supplied as JPGs. They may be replaced
+later by real screen recordings.
+7
+
+7. Technical Requirements & Constraints
+Product videos To be Real screen recordings will be captured later: (1) chat question → citation → source
+(3–4 clips) recorded page opens; (2) visual search flow; (3) Urdu/Arabic voice interaction; (4) optional
+Office viewer. The build must make video slots easy to swap (a video source per
+frame).
+Logo To be Until then, render the wordmark as text: "Seekra" in cream with a tan geometric
+supplied mark (e.g., magnifier/dot motif).
+Photography None No stock photos required; product visuals carry the page.
+A short "small video clip that tells about Seekra" is desired for the hero once recordings exist — the
+design should treat the hero frame as video-ready (muted autoplay loop, playsInline).
+7. Technical Requirements & Constraints
+Stack (preferred): React + TypeScript + Vite + Tailwind CSS, producing a static build (dist/) that can
+be served by any web server. A well-structured plain HTML/CSS/JS build is also acceptable if equally
+polished.
+No backend required for the site itself. The contact form uses a form-to-email service (FormSubmit
+endpoint: https://formsubmit.co/ajax/rahmirz.consulting@gmail.com) with graceful
+mailto: fallback and clear sending/sent/error states.
+Fonts self-hosted (no Google Fonts CDN dependency at runtime preferred).
+Performance: optimized images (progressive JPEG/WebP, <250KB each), lazy-load below-the-fold
+media, no heavy animation libraries required for the current scope (IntersectionObserver + CSS
+transitions suffice).
+SEO basics: title "Seekra — Content-Aware Intelligence for the Enterprise", meta description, Open
+Graph tags, semantic HTML, descriptive alt text.
+Accessibility: sufficient contrast in both themes, focus states, reduced-motion media query honored.
+Deployment target: static files behind nginx at the domain root; all asset paths relative; no client-side
+router needed (single page, hash anchors only).
+Internationalization: English first; keep copy centralized (single config/content file) so an Arabic (RTL)
+version can be added later without restructuring components.
+8. Competitive Positioning
+Seekra competes with cloud AI assistants (ChatGPT/ Copilot-style tools) and enterprise search products. The
+positioning line for the Gulf and Pakistani markets:
+8
+
+9. Copy Deck (Approved Messaging)
+Cloud AI assistants are excellent generalists — but they ask you to hand them your documents. Seekra
+brings the intelligence to your documents instead: it runs entirely on your infrastructure, masks personal
+data before any model sees it, and proves every answer with a citation you can open.
+The site must communicate this without disparaging competitors: the comparison table stays factual (data
+residency, citations, visual search, offline capability), and a footnote acknowledges cloud tools' strengths for
+general-purpose work.
+9. Copy Deck (Approved Messaging)
+The following copy points are approved and should appear (or be closely paraphrased) on the site:
+Hero headline: "Your documents finally answer back."
+Hero subline: "Seekra is content-aware intelligence that runs entirely on your infrastructure. Ask, see,
+and speak to your archive — every answer cited to its source."
+Primary CTA: "Book a Demo" · Secondary: "See how it works".
+Security headline: "Nothing leaves the box."
+Capability labels: Ask — answers with citations · See — search by image · Speak — Arabic, ودرا,
+English · Trust — nothing leaves the box.
+Contact heading: "See Seekra on your own documents." Supporting line: "Tell us about your archive
+and we'll arrange a live demo." Email: rahmirz.consulting@gmail.com.
+10. The AI Build Prompt (Copy-Paste Ready)
+Paste the prompt below into your chosen AI platform to generate the website. It is self-contained; attach the
+four showcase JPGs and (when available) the product videos as assets.
+You are an expert front-end designer and developer. Build a complete, production-
+ready, single-page marketing website for "Seekra", a self-hosted AI document
+intelligence platform. Deliver a responsive static site (React + TypeScript + Vite +
+Tailwind preferred; equivalently polished plain HTML/CSS/JS is acceptable). Do not
+ask me questions — make sensible decisions and build the whole thing.
+PRODUCT CONTEXT
+Seekra is a "Content-Aware Intelligence" platform. Organizations upload their
+documents; staff then chat with the archive and get answers with numbered citations
+that deep-link to the exact source document and page (opened in a built-in viewer
+for PDF/Word/Excel/PowerPoint). It also supports visual search (upload an image,
+find visually similar documents with similarity scores and detected-content labels)
+and full voice interaction that is Arabic-first, with Urdu and English parity.
+Everything is self-hosted — cloud VM, on-prem, or fully air-gapped. PII (names, IDs,
+emails, phone numbers) is automatically masked before any text reaches an LLM. Role-
+9
+
+10. The AI Build Prompt (Copy-Paste Ready)
+based access control and full audit logging are built in. Target buyers: enterprises
+and government in the Gulf region and Pakistan. Never fabricate customer logos,
+statistics, or testimonials.
+MANDATORY BRAND PALETTE (use exactly these, no substitutes):
+- #3D2B1D dark brown — primary brand color, headings, gradients
+- #B59876 tan — primary accent: CTAs, links, highlights, chips, glows
+- #E7E6E4 cream — light section backgrounds; body text on dark
+- #D8D6D3 warm gray — secondary light backgrounds, borders, muted text
+- #202020 charcoal — dark section base (hero, security, contact, footer)
+- #B93C32 brick red — sparing accent only (a period in a headline, X marks in the
+comparison table); never a background
+DESIGN LANGUAGE
+- Corporate, professional, Apple.com-class polish: cinematic spacing, one big idea
+per screen, calm motion. Do NOT copy Apple.
+- Backgrounds are SOLID. Absolutely no grid-line patterns, no square-box/dot-matrix
+textures. Depth comes only from soft radial tan/brown glows on dark sections and
+generous whitespace.
+- Rhythm: alternate dark and light chapters (dark hero → light problem/capabilities
+→ dark security → light comparison/deployment → dark contact/footer).
+- Typography: Inter (self-hosted variable font), headings 600–650 weight with tight
+tracking (-0.02em), body 400–450. Arabic/Urdu accent text (e.g. "ودرا · ﺔﻴﺑﺮﻌﻟا ·
+English") must render with correct shaping.
+- Product visuals sit inside a minimal browser-chrome frame (three dots + URL pill
+reading "app.seekra.pk"), moderate radius (10–16px), soft tan-tinted shadow,
+hairline borders.
+- Motion: subtle scroll-reveal via IntersectionObserver (fade + slight rise,
+staggered) with a ~2.5s fallback that reveals everything if observers fail; slow
+crossfade slideshows; honor prefers-reduced-motion; no autoplay audio; no parallax
+gimmicks.
+- Icons: thin-stroke line icons only (lucide style).
+PAGE STRUCTURE (single page, anchored sections, in this order):
+1. Fixed navbar (dark): tan logo mark + "Seekra" wordmark; links Capabilities /
+Security / Deployment / Contact; tan pill button "Book a Demo". Transparent at top,
+frosted #202020/85 + backdrop blur after scroll; hamburger on mobile.
+2. HERO (dark): Do NOT make this a solid text hero. Centerpiece is an animated
+showcase inside a browser frame: an auto-crossfading slideshow of 4 provided 16:9
+scenes (chat.jpg, visual.jpg, voice.jpg, security.jpg — supplied as assets), ~5s per
+scene with a slow Ken Burns zoom, a caption pill at the bottom cycling "Ask —
+answers with citations", "See — search by image", "Speak — Arabic · ودرا · English",
+"Trust — nothing leaves the box", plus clickable progress dots. Above the frame, a
+compact one-line headline: "Your documents finally answer back." with "answer back"
+in #B59876 and the period in #B93C32. Subline: "Seekra is content-aware intelligence
+that runs entirely on your infrastructure. Ask, see, and speak to your archive —
+every answer cited to its source." Floating frosted-glass chips around the frame:
+"Cited answers", "ودرا · ﺔﻴﺑﺮﻌﻟا · English", "100% visual match", "Air-gapped
+ready". CTAs: "Book a Demo" (solid #B59876, text #202020) and "See how it works"
+10
+
+11. Acceptance Checklist
+(ghost, scrolls to capabilities). Make the frame video-ready: it must accept a muted
+autoplay looping
+11. Acceptance Checklist
+Use this checklist to review whatever the AI platform produces:
+1. Exact palette used (#3D2B1D, #B59876, #E7E6E4, #D8D6D3, #202020, #B93C32) — no foreign
+accent colors.
+2. Backgrounds solid; no grid/square/dot patterns anywhere.
+3. Hero plays the animated 4-scene showcase in a browser frame — not a solid text hero.
+4. All nine sections present, in the specified order, with dark/light rhythm.
+5. Red used only sparingly (headline period, comparison X marks).
+6. Contact form delivers to rahmirz.consulting@gmail.com with mailto fallback; email visible on page.
+7. No pricing, no fabricated customers/stats/testimonials.
+8. Mobile layout verified; scroll-reveal fallback works with JavaScript observers disabled.
+9. Copy centralized for the future Arabic RTL version.
+10. Video slots swappable without code restructuring.
+11

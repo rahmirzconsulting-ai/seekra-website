@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Seekra · Trust — Security & Sovereignty</title>
+<link rel="stylesheet" href="global.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<style>
+  .sec-card {
+    width: 540px; height: 150px;
+    background: rgba(231,230,228,0.05);
+    border: 1px solid rgba(231,230,228,0.14);
+    border-radius: 14px;
+    padding: 24px;
+    display: flex; align-items: flex-start; gap: 18px;
+  }
+  .sec-icon-box {
+    width: 56px; height: 56px;
+    background: rgba(181,152,118,0.16);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .sec-icon-box .material-icons { color: #B59876; font-size: 28px; }
+  .sec-title { font-family: var(--font-heading); font-weight: 600; font-size: 18px; color: #E7E6E4; line-height: 1.3; letter-spacing: -0.005em; }
+  .sec-body { font-weight: 400; font-size: 14px; line-height: 1.55; color: rgba(231,230,228,0.70); margin-top: 6px; }
+</style>
+</head>
+<body>
+<section class="slide slide-brown">
+  <div class="glow-tan tr" data-decor aria-hidden="true"></div>
+  <div class="relative h-full flex flex-col">
+    <div style="max-width: 900px;">
+      <div class="eyebrow">TRUST · SECURITY &amp; SOVEREIGNTY</div>
+      <h1 style="font-family: var(--font-heading); font-weight: 700; font-size: 64px; line-height: 1.05; letter-spacing: -0.03em; color: #E7E6E4; margin-top: 14px;">
+        Nothing leaves the box<span style="color: #B93C32; font-size: 80px; line-height: 0.6;">.</span>
+      </h1>
+      <p style="font-weight: 400; font-size: 17px; line-height: 1.6; color: rgba(231,230,228,0.78); margin-top: 22px; max-width: 860px;">
+        This is the decisive argument for government, legal, healthcare, and financial buyers. Seekra runs entirely on the customer&rsquo;s own infrastructure — cloud VM, on-premises, or fully air-gapped with no external network connection. Personal information is automatically detected and masked before any AI model is involved.
+      </p>
+    </div>
+    <div style="margin-top: 32px; display: grid; grid-template-columns: 540px 540px; column-gap: 24px; row-gap: 24px;">
+      <div class="sec-card">
+        <div class="sec-icon-box"><span class="material-icons">dns</span></div>
+        <div>
+          <div class="sec-title">Self-hosted &amp; air-gap ready</div>
+          <div class="sec-body">Runs on your cloud VM, your on-prem servers, or fully air-gapped. Nothing leaves your infrastructure.</div>
+        </div>
+      </div>
+      <div class="sec-card">
+        <div class="sec-icon-box"><span class="material-icons">visibility_off</span></div>
+        <div>
+          <div class="sec-title">PII masked before the AI</div>
+          <div class="sec-body">Names, ID numbers, emails, and phone numbers are automatically redacted before any text reaches the AI model.</div>
+        </div>
+      </div>
+      <div class="sec-card">
+        <div class="sec-icon-box"><span class="material-icons">admin_panel_settings</span></div>
+        <div>
+          <div class="sec-title">Role-based access control</div>
+          <div class="sec-body">Granular permissions: administrators, editors, viewers, and read-only auditors. Collections can be restricted to specific users.</div>
+        </div>
+      </div>
+      <div class="sec-card">
+        <div class="sec-icon-box"><span class="material-icons">fact_check</span></div>
+        <div>
+          <div class="sec-title">Full audit logging</div>
+          <div class="sec-body">Every security-relevant action is logged with actor and detail — logins, password resets, file events, permission grants. Forensically reconstructable.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<aside data-notes class="hidden">
+  <ul>
+    <li>Pause on the headline — let &ldquo;Nothing leaves the box&rdquo; land before moving on.</li>
+    <li>Lead with air-gapped: the killer argument for Gulf government and classified workloads.</li>
+    <li>PII masking happens BEFORE the AI sees text — structural, not a setting.</li>
+    <li>RBAC includes a read-only auditor role for oversight teams.</li>
+    <li>Audit trail is complete enough for forensic reconstruction of any incident.</li>
+  </ul>
+</aside>
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Seekra — Deployment Options</title>
+  <link rel="stylesheet" href="global.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    .slide-10 .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: var(--tan); }
+    .slide-10 .headline { font-family: var(--font-heading); font-weight: 700; font-size: 44px; line-height: 1.15; letter-spacing: -0.02em; color: var(--brown); margin-top: 14px; }
+    .slide-10 .lead { font-weight: 400; font-size: 16px; line-height: 1.6; color: var(--ink-2); margin-top: 16px; max-width: 880px; }
+    .slide-10 .card-grid { display: grid; grid-template-columns: 360px 360px 360px; gap: 24px; margin-top: 32px; align-items: start; justify-content: center; }
+    .slide-10 .side-card { width: 360px; height: 320px; background: #FFFFFF; border: 1px solid rgba(61,43,29,0.10); border-radius: 14px; padding: 32px; box-shadow: 0 1px 0 rgba(61,43,29,0.04); }
+    .slide-10 .featured-card { width: 360px; height: 340px; background: var(--charcoal); border: 1px solid rgba(181,152,118,0.30); border-radius: 14px; padding: 32px; margin-top: -10px; position: relative; z-index: 2; }
+    .slide-10 .featured-glow { position: absolute; width: 320px; height: 320px; border-radius: 50%; background: radial-gradient(circle, rgba(181,152,118,0.30) 0%, rgba(181,152,118,0) 65%); filter: blur(8px); top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 0; pointer-events: none; }
+    .slide-10 .icon-square { width: 64px; height: 64px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+    .slide-10 .icon-square.side { background: rgba(181,152,118,0.10); }
+    .slide-10 .icon-square.featured { background: rgba(181,152,118,0.18); }
+    .slide-10 .card-title { font-family: var(--font-heading); font-weight: 600; font-size: 22px; margin-top: 18px; letter-spacing: -0.01em; }
+    .slide-10 .card-body { font-weight: 400; font-size: 14px; line-height: 1.6; margin-top: 12px; }
+    .slide-10 .card-label { font-weight: 600; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--tan); }
+    .slide-10 .footnote { position: absolute; left: 64px; right: 64px; bottom: 32px; font-size: 12px; font-style: italic; color: var(--ink-2); }
+  </style>
+</head>
+<body>
+  <div class="slide slide-gray slide-10">
+    <div class="eyebrow">DEPLOYMENT</div>
+    <h1 class="headline period-red">Three ways to run Seekra. You choose</h1>
+    <p class="lead">Seekra adapts to your infrastructure policy. Move between deployment models as your needs evolve — the platform stays the same.</p>
+
+    <div class="card-grid">
+      <!-- Card 1: Cloud VM -->
+      <div class="side-card">
+        <div class="icon-square side">
+          <span class="material-icons" style="color: var(--tan); font-size: 36px;">cloud</span>
+        </div>
+        <div class="card-title" style="color: var(--brown);">Cloud VM</div>
+        <p class="card-body" style="color: var(--ink-2);">Runs on your own AWS, Azure, or Google Cloud account. You control the keys, the region, and the network. Data stays inside your tenant.</p>
+        <div class="card-label" style="margin-top: 18px;">STANDARD</div>
+      </div>
+
+      <!-- Card 2: Air-gapped (Featured) -->
+      <div class="featured-card">
+        <div class="featured-glow" data-decor aria-hidden="true"></div>
+        <div class="icon-square featured" style="position: relative; z-index: 1;">
+          <span class="material-icons" style="color: var(--tan); font-size: 36px;">shield_lock</span>
+        </div>
+        <div class="card-title" style="color: var(--cream); position: relative; z-index: 1;">Air-gapped / offline</div>
+        <p class="card-body" style="color: rgba(231,230,228,0.78); position: relative; z-index: 1;">Fully isolated. No external network connection required. The strongest possible deployment for classified, regulated, or sovereign workloads.</p>
+        <div class="card-label" style="margin-top: 18px; position: relative; z-index: 1;">FEATURED · MOST SECURE</div>
+      </div>
+
+      <!-- Card 3: On-premises -->
+      <div class="side-card">
+        <div class="icon-square side">
+          <span class="material-icons" style="color: var(--tan); font-size: 36px;">storage</span>
+        </div>
+        <div class="card-title" style="color: var(--brown);">On-premises</div>
+        <p class="card-body" style="color: var(--ink-2);">Installed on servers inside your data center. No traffic to any external cloud. Operates inside your existing security perimeter.</p>
+        <div class="card-label" style="margin-top: 18px;">STANDARD</div>
+      </div>
+    </div>
+
+    <div class="footnote">No pricing is published. Deployment model and scale are discussed in person during the demo.</div>
+  </div>
+
+  <aside data-notes class="hidden">
+    • Three deployment options, one platform — migration between models is straightforward.
+    • Most clients start with Cloud VM for evaluation, then move to On-premises or Air-gapped for production.
+    • Air-gapped is the differentiator for Gulf government — emphasize this is real today, not a roadmap item.
+    • Pricing is always discussed in person during the demo, never published.
+  </aside>
+</body>
+</html>

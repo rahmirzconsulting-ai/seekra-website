@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Seekra — The Approach</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="global.css">
+  <style>
+    .eyebrow-tan {
+      font-family: var(--font-body);
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--tan);
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+    }
+    .approach-headline {
+      font-family: var(--font-heading);
+      font-weight: 700;
+      font-size: 50px;
+      line-height: 1.10;
+      letter-spacing: -0.025em;
+      color: var(--cream);
+      max-width: 1000px;
+      margin-top: 14px;
+    }
+    .approach-headline .accent { color: var(--tan); }
+    .approach-lead {
+      font-family: var(--font-body);
+      font-weight: 400;
+      font-size: 16px;
+      line-height: 1.55;
+      color: rgba(231,230,228,0.72);
+      max-width: 920px;
+      margin-top: 18px;
+    }
+    .pillar-card {
+      width: 540px;
+      height: 154px;
+      background: rgba(231,230,228,0.04);
+      border: 1px solid rgba(231,230,228,0.10);
+      border-radius: 14px;
+      padding: 22px;
+      display: flex;
+      align-items: flex-start;
+      gap: 18px;
+    }
+    .pillar-icon-box {
+      width: 60px;
+      height: 60px;
+      flex-shrink: 0;
+      background: rgba(181,152,118,0.12);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pillar-icon-box .material-icons {
+      color: var(--tan);
+      font-size: 30px !important;
+    }
+    .pillar-text {
+      flex: 1;
+      min-width: 0;
+    }
+    .pillar-label {
+      font-family: var(--font-heading);
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--tan);
+    }
+    .pillar-head {
+      font-family: var(--font-heading);
+      font-weight: 600;
+      font-size: 19px;
+      color: var(--cream);
+      margin-top: 4px;
+      letter-spacing: -0.01em;
+    }
+    .pillar-body {
+      font-family: var(--font-body);
+      font-weight: 400;
+      font-size: 14px;
+      line-height: 1.55;
+      color: rgba(231,230,228,0.68);
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide slide-dark">
+    <!-- Decorative tan glow top-right -->
+    <div class="glow-tan tr" data-decor aria-hidden="true"></div>
+
+    <!-- TOP BLOCK -->
+    <div style="position:relative; z-index:2; max-width:1000px;">
+      <div class="eyebrow-tan">The Seekra Approach</div>
+      <h1 class="approach-headline">
+        Bring the <span class="accent">intelligence</span> to your documents — not the other way around.
+      </h1>
+      <p class="approach-lead">
+        Cloud AI assistants are excellent generalists, but they ask you to hand them your documents. Seekra reverses the relationship: the platform runs entirely on your infrastructure, masks personal data before any model sees it, and proves every answer with a citation you can open.
+      </p>
+    </div>
+
+    <!-- 2x2 GRID -->
+    <div style="position:relative; z-index:2; margin-top:24px; display:grid; grid-template-columns:540px 540px; grid-template-rows:154px 154px; gap:24px;">
+      <!-- PILLAR 1 -->
+      <div class="pillar-card">
+        <div class="pillar-icon-box"><span class="material-icons">forum</span></div>
+        <div class="pillar-text">
+          <div class="pillar-label">Ask</div>
+          <div class="pillar-head">Conversational Q&amp;A</div>
+          <div class="pillar-body">Chat with the entire archive in natural language. Every answer carries numbered citations that deep-link to the exact source page.</div>
+        </div>
+      </div>
+
+      <!-- PILLAR 2 -->
+      <div class="pillar-card">
+        <div class="pillar-icon-box"><span class="material-icons">image_search</span></div>
+        <div class="pillar-text">
+          <div class="pillar-label">See</div>
+          <div class="pillar-head">Search by image</div>
+          <div class="pillar-body">Upload a photo or scan; Seekra finds visually similar items across the archive with similarity scores and detected-content labels.</div>
+        </div>
+      </div>
+
+      <!-- PILLAR 3 -->
+      <div class="pillar-card">
+        <div class="pillar-icon-box"><span class="material-icons">mic</span></div>
+        <div class="pillar-text">
+          <div class="pillar-label">Speak</div>
+          <div class="pillar-head">Arabic-first voice</div>
+          <div class="pillar-body">Full voice interaction with Arabic as a first-class citizen, alongside Urdu and English. Built for the Gulf and Pakistan.</div>
+        </div>
+      </div>
+
+      <!-- PILLAR 4 -->
+      <div class="pillar-card">
+        <div class="pillar-icon-box"><span class="material-icons">shield</span></div>
+        <div class="pillar-text">
+          <div class="pillar-label">Trust</div>
+          <div class="pillar-head">Nothing leaves the box</div>
+          <div class="pillar-body">Self-hosted on your servers, including fully air-gapped. PII masked before any AI. Role-based access and full audit logging.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <aside data-notes class="hidden">
+    • State the positioning line clearly: "Bring the intelligence to your documents — not the other way around."
+    • Walk through the four pillars quickly — Ask, See, Speak, Trust — each gets a deeper slide next.
+    • Emphasize this is one integrated platform, not four separate products bolted together.
+    • Highlight that "Trust" is built into the architecture, not added on as a compliance afterthought.
+    • Transition: "Let's start with Ask — the capability most buyers will use every day."
+  </aside>
+</body>
+</html>

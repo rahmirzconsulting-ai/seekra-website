@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Seekra · Capability Comparison</title>
+<link rel="stylesheet" href="global.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<style>
+  .compare-card {
+    background: #FFFFFF;
+    border: 1px solid rgba(61,43,29,0.12);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-top: 22px;
+  }
+  table.compare th, table.compare td {
+    padding: 12px 18px;
+    text-align: left;
+    vertical-align: middle;
+  }
+  table.compare thead th {
+    background: #F5F4F2;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: #3D2B1D;
+    border-bottom: 1px solid rgba(61,43,29,0.12);
+  }
+  table.compare tbody tr:nth-child(odd) td { background: rgba(61,43,29,0.025); }
+  table.compare tbody td {
+    font-size: 14px;
+    color: #1F1A14;
+    line-height: 1.45;
+  }
+  table.compare td.col-feature { font-weight: 500; color: #3D2B1D; }
+  .yes { color: #B59876; font-weight: 600; }
+  .no  { color: #B93C32; font-weight: 600; }
+  .partial { color: #4A3F33; font-weight: 500; font-style: italic; }
+</style>
+</head>
+<body>
+<section class="slide slide-light">
+  <div class="h-full flex flex-col">
+    <div>
+      <div class="eyebrow">HOW SEEKRA COMPARES</div>
+      <h1 style="font-family: var(--font-heading); font-weight: 700; font-size: 42px; line-height: 1.15; letter-spacing: -0.02em; color: #3D2B1D; margin-top: 14px;">
+        An honest comparison<span style="color: #B93C32;">.</span>
+      </h1>
+      <p style="font-weight: 400; font-size: 16px; line-height: 1.55; color: #4A3F33; margin-top: 12px; max-width: 880px;">
+        Cloud AI assistants are strong for general-purpose work. The comparison below concerns enterprise data handling — where Seekra is purpose-built.
+      </p>
+    </div>
+    <div class="compare-card">
+      <table class="compare">
+        <thead>
+          <tr>
+            <th style="width: 40%;">Capability</th>
+            <th style="width: 30%;">Seekra</th>
+            <th style="width: 30%;">Typical Cloud AI</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-feature">Data residency inside your infrastructure</td>
+            <td><span class="yes">&#10003; Yes</span></td>
+            <td><span class="no">&#10007; No</span></td>
+          </tr>
+          <tr>
+            <td class="col-feature">Air-gapped / offline option</td>
+            <td><span class="yes">&#10003; Yes</span></td>
+            <td><span class="no">&#10007; No</span></td>
+          </tr>
+          <tr>
+            <td class="col-feature">PII masked before AI</td>
+            <td><span class="yes">&#10003; Yes</span></td>
+            <td><span class="partial">Partial</span></td>
+          </tr>
+          <tr>
+            <td class="col-feature">Page-level citations to source</td>
+            <td><span class="yes">&#10003; Yes</span></td>
+            <td><span class="partial">Partial</span></td>
+          </tr>
+          <tr>
+            <td class="col-feature">Visual / image search</td>
+            <td><span class="yes">&#10003; Yes</span></td>
+            <td><span class="partial">Partial</span></td>
+          </tr>
+          <tr>
+            <td class="col-feature">Arabic &amp; Urdu voice (first-class)</td>
+            <td><span class="yes">&#10003; Yes</span></td>
+            <td><span class="partial">Partial</span></td>
+          </tr>
+          <tr>
+            <td class="col-feature">Offline operation</td>
+            <td><span class="yes">&#10003; Yes</span></td>
+            <td><span class="no">&#10007; No</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top: 18px; font-size: 12px; font-style: italic; color: #4A3F33; max-width: 1000px; line-height: 1.5;">
+      Cloud AI tools are excellent generalists. This comparison concerns enterprise data handling, sovereignty, and verifiable answers — not general-purpose assistant quality.
+    </p>
+  </div>
+</section>
+<aside data-notes class="hidden">
+  <ul>
+    <li>Walk the table top-to-bottom but only dwell on the three rows that matter most to the client.</li>
+    <li>&ldquo;Partial&rdquo; is honest, not a competitor hit — cloud tools are good, just not for this use case.</li>
+    <li>Read the footnote aloud — it positions Seekra as purpose-built, not anti-cloud.</li>
+    <li>Close with &ldquo;this is why Seekra exists&rdquo; to set up the deployment options slide.</li>
+  </ul>
+</aside>
+</body>
+</html>
