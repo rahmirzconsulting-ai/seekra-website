@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Seekra — Deployment Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --cream: #E7E6E4;
+    --warm-gray: #D8D6D3;
+    --charcoal: #202020;
+    --charcoal-2: #1A1A1A;
+    --tan: #B59876;
+    --tan-soft: #C9B498;
+    --tan-tint: rgba(181, 152, 118, 0.10);
+    --tan-tint-strong: rgba(181, 152, 118, 0.18);
+    --tan-border: rgba(181, 152, 118, 0.40);
+    --brick: #B93C32;
+    --ink: #1F1A14;
+    --ink-2: #4A3F33;
+    --ink-muted: #6B5E50;
+    --hair: rgba(31, 26, 20, 0.10);
+    --card-bg: #FFFFFF;
+    --green: #4A7A52;
+    --green-tint: rgba(74, 122, 82, 0.10);
+  }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    padding: 48px 40px;
+  }
+  #root {
+    width: 2400px;
+    margin: 0 auto;
+    background: var(--cream);
+  }
+  /* ─── Title bar ─── */
+  .title-block { text-align: center; margin-bottom: 36px; }
+  .title-eyebrow {
+    font-size: 13px; font-weight: 700; letter-spacing: 0.24em;
+    text-transform: uppercase; color: var(--ink); margin-bottom: 10px;
+  }
+  .title-main {
+    font-size: 36px; font-weight: 700; letter-spacing: -0.02em;
+    color: var(--ink); line-height: 1.2;
+  }
+  .title-main .dot { color: var(--brick); }
+  .title-sub {
+    font-size: 15px; color: var(--ink-2); margin-top: 12px;
+    max-width: 1200px; margin-left: auto; margin-right: auto; line-height: 1.5;
+  }
+  /* ─── 3-panel grid ─── */
+  .panels {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 28px;
+    margin-top: 8px;
+  }
+  .panel {
+    background: #FFFFFF;
+    border: 1px solid var(--hair);
+    border-radius: 18px;
+    padding: 28px 26px 24px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 920px;
+  }
+  /* Featured tier 3 styling */
+  .panel.featured {
+    background: var(--charcoal);
+    border: 1px solid var(--tan-border);
+    box-shadow: 0 0 0 1px rgba(181, 152, 118, 0.20), 0 12px 40px rgba(181, 152, 118, 0.18);
+  }
+  .panel.featured .tier-head-title,
+  .panel.featured .tier-head-sub { color: var(--cream); }
+  .panel.featured .tier-badge { background: rgba(181, 152, 118, 0.18); color: var(--tan); border-color: rgba(181, 152, 118, 0.45); }
+  .panel.featured .boundary-label { color: var(--tan); }
+  .panel.featured .component-card { background: rgba(231, 230, 228, 0.06); border-color: rgba(231, 230, 228, 0.16); }
+  .panel.featured .component-card .comp-label { color: var(--cream); }
+  .panel.featured .component-card .comp-sub { color: rgba(231, 230, 228, 0.70); }
+  .panel.featured .component-card .material-icons { color: var(--tan); }
+  .panel.featured .boundary-box { border-color: rgba(181, 152, 118, 0.55); background: rgba(231, 230, 228, 0.025); }
+  .panel.featured .external-card { background: rgba(231, 230, 228, 0.04); border-color: rgba(231, 230, 228, 0.18); }
+  .panel.featured .external-card .comp-label { color: rgba(231, 230, 228, 0.85); }
+  .panel.featured .external-card .comp-sub { color: rgba(231, 230, 228, 0.55); }
+  .panel.featured .pii-card { background: rgba(181, 152, 118, 0.18) !important; border-color: var(--tan) !important; }
+  .panel.featured .pii-card .comp-label { color: var(--cream) !important; }
+  .panel.featured .pii-card .comp-sub { color: rgba(231, 230, 228, 0.80) !important; }
+  .panel.featured .network-bar { background: rgba(185, 60, 50, 0.18); border-color: rgba(185, 60, 50, 0.55); }
+  .panel.featured .network-bar .net-label { color: var(--cream); }
+  .panel.featured .network-bar .net-detail { color: rgba(231, 230, 228, 0.75); }
+
+  /* ─── Tier head ─── */
+  .tier-head { margin-bottom: 22px; }
+  .tier-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--tan-tint);
+    color: var(--ink);
+    border: 1px solid var(--tan-border);
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .tier-head-title {
+    font-size: 26px; font-weight: 700; color: var(--ink);
+    letter-spacing: -0.015em; line-height: 1.2;
+  }
+  .tier-head-sub {
+    font-size: 13px; color: var(--ink-2); margin-top: 6px;
+    line-height: 1.5;
+  }
+
+  /* ─── Customer boundary box ─── */
+  .boundary-wrap {
+    position: relative; flex: 1;
+    margin-bottom: 16px;
+  }
+  .boundary-box {
+    border: 2px dashed var(--tan);
+    border-radius: 14px;
+    padding: 22px 18px 18px;
+    background: var(--tan-tint);
+    position: relative;
+    min-height: 480px;
+  }
+  .boundary-label {
+    position: absolute;
+    top: -11px; left: 18px;
+    background: #FFFFFF;
+    padding: 0 10px;
+    font-size: 10px; font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+  }
+  .panel.featured .boundary-label { background: var(--charcoal); }
+
+  /* ─── Component cards (inside boundary) ─── */
+  .components {
+    display: flex; flex-direction: column; gap: 12px;
+    margin-top: 8px;
+  }
+  .component-card {
+    background: var(--card-bg);
+    border: 1px solid var(--hair);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .component-card .material-icons {
+    color: var(--tan);
+    font-size: 26px;
+    flex-shrink: 0;
+  }
+  .component-card .comp-text { flex: 1; min-width: 0; }
+  .component-card .comp-label {
+    font-size: 14px; font-weight: 600;
+    color: var(--ink);
+    line-height: 1.3;
+    letter-spacing: -0.005em;
+  }
+  .component-card .comp-sub {
+    font-size: 11px; color: var(--ink-2);
+    margin-top: 2px; line-height: 1.4;
+  }
+  /* PII card highlighted (always inside boundary) */
+  .pii-card {
+    background: rgba(181, 152, 118, 0.14) !important;
+    border: 1.5px solid var(--tan) !important;
+  }
+  .pii-card .material-icons { color: var(--tan) !important; }
+  .pii-card .comp-label { color: var(--ink) !important; }
+  .pii-card .comp-sub { color: var(--ink-2) !important; }
+
+  /* ─── External card (outside boundary, tier 1 only) ─── */
+  .external-section {
+    margin-top: 14px;
+  }
+  .external-section-title {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.20em; text-transform: uppercase;
+    color: var(--ink-muted);
+    margin-bottom: 8px;
+  }
+  .external-card {
+    background: var(--card-bg);
+    border: 1px dashed var(--hair);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .external-card .material-icons {
+    color: var(--ink-muted);
+    font-size: 26px;
+    flex-shrink: 0;
+  }
+  .external-card .comp-label {
+    font-size: 14px; font-weight: 600;
+    color: var(--ink);
+    line-height: 1.3;
+  }
+  .external-card .comp-sub {
+    font-size: 11px; color: var(--ink-2);
+    margin-top: 2px; line-height: 1.4;
+  }
+  /* Empty state for tiers 2 and 3 (no external AI) */
+  .no-external {
+    margin-top: 14px;
+    padding: 14px 16px;
+    background: transparent;
+    border: 1px dashed var(--hair);
+    border-radius: 10px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--ink-muted);
+    font-style: italic;
+    line-height: 1.5;
+  }
+  .panel.featured .no-external {
+    border-color: rgba(231, 230, 228, 0.18);
+    color: rgba(231, 230, 228, 0.55);
+  }
+
+  /* ─── Network state bar ─── */
+  .network-bar {
+    margin-top: auto;
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 12px;
+    border: 1px solid;
+  }
+  .network-bar.connected {
+    background: var(--tan-tint);
+    border-color: var(--tan-border);
+  }
+  .network-bar.update-only {
+    background: var(--green-tint);
+    border-color: rgba(74, 122, 82, 0.40);
+  }
+  .network-bar .material-icons {
+    font-size: 26px;
+    flex-shrink: 0;
+  }
+  .network-bar.connected .material-icons { color: var(--tan); }
+  .network-bar.update-only .material-icons { color: var(--green); }
+  .network-bar .net-label {
+    font-size: 13px; font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.04em;
+  }
+  .network-bar .net-detail {
+    font-size: 11px; color: var(--ink-2);
+    margin-top: 2px; line-height: 1.4;
+  }
+
+  /* ─── Arrow connecting PII to external AI (tier 1 only) ─── */
+  .arrow-out {
+    display: flex; flex-direction: column; align-items: center;
+    margin: 6px 0 0;
+  }
+  .arrow-out .arrow-line {
+    width: 2px; height: 16px;
+    background: var(--tan);
+  }
+  .arrow-out .arrow-head {
+    width: 0; height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 8px solid var(--tan);
+    margin-top: -1px;
+  }
+  .arrow-label {
+    font-size: 10px; font-weight: 600;
+    color: var(--ink-2);
+    background: #FFFFFF;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--tan-border);
+    margin-top: 4px;
+    white-space: nowrap;
+  }
+
+  /* ─── Featured tier extras (lock + physical media) ─── */
+  .featured-extras {
+    display: flex; gap: 8px; margin-top: 10px;
+  }
+  .featured-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px;
+    background: rgba(181, 152, 118, 0.16);
+    border: 1px solid rgba(181, 152, 118, 0.40);
+    border-radius: 6px;
+    font-size: 10px; font-weight: 600;
+    color: var(--tan);
+    letter-spacing: 0.06em;
+  }
+  .featured-chip.brick {
+    background: rgba(185, 60, 50, 0.14);
+    border-color: rgba(185, 60, 50, 0.45);
+    color: var(--brick);
+  }
+  .featured-chip .material-icons { font-size: 14px; }
+
+  /* ─── Footer legend ─── */
+  .footer-legend {
+    margin-top: 32px;
+    display: flex;
+    justify-content: center;
+    gap: 36px;
+    padding: 18px 24px;
+    background: #FFFFFF;
+    border: 1px solid var(--hair);
+    border-radius: 12px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 12px; color: var(--ink-2);
+    line-height: 1.4;
+  }
+  .legend-swatch {
+    width: 16px; height: 16px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .legend-swatch.pii { background: rgba(181, 152, 118, 0.30); border: 1.5px solid var(--tan); }
+  .legend-swatch.boundary { background: transparent; border: 2px dashed var(--tan); }
+  .legend-swatch.external { background: var(--card-bg); border: 1px dashed var(--hair); }
+  .legend-swatch.local-ai { background: var(--card-bg); border: 1px solid var(--hair); }
+  .legend-swatch.network-connected { background: var(--tan-tint); border: 1px solid var(--tan-border); }
+  .legend-swatch.network-update { background: var(--green-tint); border: 1px solid rgba(74, 122, 82, 0.40); }
+  .legend-swatch.network-isolated { background: rgba(185, 60, 50, 0.18); border: 1px solid rgba(185, 60, 50, 0.55); }
+</style>
+</head>
+<body>
+<div id="root">
+
+  <!-- Title -->
+  <div class="title-block">
+    <div class="title-eyebrow">Seekra · Deployment Architecture</div>
+    <div class="title-main">Three deployment tiers<span class="dot">.</span> One platform.</div>
+    <div class="title-sub">Where the AI runs, what stays inside your boundary, and how each tier isolates your data — visualised side-by-side for direct comparison. All three tiers share the same Seekra application, PII masking layer, and document store; only the AI model location and network exposure change.</div>
+  </div>
+
+  <!-- 3 panels -->
+  <div class="panels">
+
+    <!-- ════════════ TIER 1 — CLOUD NATIVE ════════════ -->
+    <div class="panel">
+      <div class="tier-head">
+        <span class="tier-badge">Tier 01 · Fastest</span>
+        <div class="tier-head-title">Cloud Native</div>
+        <div class="tier-head-sub">Seekra runs in your cloud tenant and can leverage industry-leading external AI models — with PII automatically masked before any external call.</div>
+      </div>
+
+      <div class="boundary-wrap">
+        <div class="boundary-box">
+          <div class="boundary-label">Customer Cloud Tenant</div>
+          <div class="components">
+            <div class="component-card">
+              <span class="material-icons">apps</span>
+              <div class="comp-text">
+                <div class="comp-label">Seekra Application</div>
+                <div class="comp-sub">UI, search, citations, RBAC, audit</div>
+              </div>
+            </div>
+            <div class="component-card pii-card">
+              <span class="material-icons">visibility_off</span>
+              <div class="comp-text">
+                <div class="comp-label">PII Masking Layer</div>
+                <div class="comp-sub">Names, IDs, emails, phones redacted upstream</div>
+              </div>
+            </div>
+            <div class="component-card">
+              <span class="material-icons">folder_shared</span>
+              <div class="comp-text">
+                <div class="comp-label">Document Store</div>
+                <div class="comp-sub">Your files, your keys, your region</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Arrow out -->
+        <div class="arrow-out">
+          <div class="arrow-line"></div>
+          <div class="arrow-head"></div>
+          <div class="arrow-label">PII already masked</div>
+        </div>
+
+        <!-- External -->
+        <div class="external-section">
+          <div class="external-section-title">External · Outside Your Boundary</div>
+          <div class="external-card">
+            <span class="material-icons">cloud</span>
+            <div class="comp-text">
+              <div class="comp-label">External AI APIs</div>
+              <div class="comp-sub">ChatGPT · Gemini · Claude (swappable)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="network-bar connected">
+        <span class="material-icons">wifi</span>
+        <div>
+          <div class="net-label">Network: Connected</div>
+          <div class="net-detail">Outbound to external AI APIs (PII masked). Updates over standard internet.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════ TIER 2 — SELF-HOSTED ════════════ -->
+    <div class="panel">
+      <div class="tier-head">
+        <span class="tier-badge">Tier 02 · Sovereign</span>
+        <div class="tier-head-title">Self-Hosted</div>
+        <div class="tier-head-sub">Seekra runs entirely on your own infrastructure — cloud VM or on-premises servers — with AI models hosted locally. Full data sovereignty. Nothing leaves your network.</div>
+      </div>
+
+      <div class="boundary-wrap">
+        <div class="boundary-box">
+          <div class="boundary-label">Customer Infrastructure</div>
+          <div class="components">
+            <div class="component-card">
+              <span class="material-icons">apps</span>
+              <div class="comp-text">
+                <div class="comp-label">Seekra Application</div>
+                <div class="comp-sub">UI, search, citations, RBAC, audit</div>
+              </div>
+            </div>
+            <div class="component-card pii-card">
+              <span class="material-icons">visibility_off</span>
+              <div class="comp-text">
+                <div class="comp-label">PII Masking Layer</div>
+                <div class="comp-sub">Redacted before any local model call</div>
+              </div>
+            </div>
+            <div class="component-card">
+              <span class="material-icons">folder_shared</span>
+              <div class="comp-text">
+                <div class="comp-label">Document Store</div>
+                <div class="comp-sub">Files remain on your servers</div>
+              </div>
+            </div>
+            <div class="component-card">
+              <span class="material-icons">memory</span>
+              <div class="comp-text">
+                <div class="comp-label">Local AI Models</div>
+                <div class="comp-sub">LLM + embeddings hosted on your hardware</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- No external -->
+        <div class="no-external">No external AI calls. All AI inference happens inside your boundary.</div>
+      </div>
+
+      <div class="network-bar update-only">
+        <span class="material-icons">sync</span>
+        <div>
+          <div class="net-label">Network: Updates Only</div>
+          <div class="net-detail">Internet used for software updates only. No AI traffic, no document traffic leaves.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════ TIER 3 — AIR-GAPPED (FEATURED) ════════════ -->
+    <div class="panel featured">
+      <div class="tier-head">
+        <span class="tier-badge">Tier 03 · Maximum Security</span>
+        <div class="tier-head-title">Air-Gapped</div>
+        <div class="tier-head-sub">Fully isolated self-hosted deployment with no external network connection. For classified, sovereign, or maximum-security workloads where even update traffic is not permitted.</div>
+      </div>
+
+      <div class="boundary-wrap">
+        <div class="boundary-box">
+          <div class="boundary-label">Customer Isolated Infrastructure</div>
+          <div class="components">
+            <div class="component-card">
+              <span class="material-icons">apps</span>
+              <div class="comp-text">
+                <div class="comp-label">Seekra Application</div>
+                <div class="comp-sub">UI, search, citations, RBAC, audit</div>
+              </div>
+            </div>
+            <div class="component-card pii-card">
+              <span class="material-icons">visibility_off</span>
+              <div class="comp-text">
+                <div class="comp-label">PII Masking Layer</div>
+                <div class="comp-sub">Redacted before any local model call</div>
+              </div>
+            </div>
+            <div class="component-card">
+              <span class="material-icons">folder_shared</span>
+              <div class="comp-text">
+                <div class="comp-label">Document Store</div>
+                <div class="comp-sub">Files remain on isolated servers</div>
+              </div>
+            </div>
+            <div class="component-card">
+              <span class="material-icons">memory</span>
+              <div class="comp-text">
+                <div class="comp-label">Local AI Models</div>
+                <div class="comp-sub">LLM + embeddings on isolated hardware</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Featured chips: lock + physical media -->
+          <div class="featured-extras">
+            <span class="featured-chip"><span class="material-icons">lock</span>No external network</span>
+            <span class="featured-chip brick"><span class="material-icons">usb</span>Updates via physical media</span>
+          </div>
+        </div>
+
+        <!-- No external -->
+        <div class="no-external">No external AI calls. No external network at all. Updates delivered via physical media or one-way data diode.</div>
+      </div>
+
+      <div class="network-bar">
+        <span class="material-icons" style="color: var(--brick);">block</span>
+        <div>
+          <div class="net-label">Network: Fully Isolated</div>
+          <div class="net-detail">No outbound or inbound network. Updates via physical media / data diode only.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer legend -->
+  <div class="footer-legend">
+    <div class="legend-item"><div class="legend-swatch boundary"></div>Customer boundary (dashed)</div>
+    <div class="legend-item"><div class="legend-swatch pii"></div>PII masking layer (always inside)</div>
+    <div class="legend-item"><div class="legend-swatch local-ai"></div>Local AI models (tiers 2 & 3 only)</div>
+    <div class="legend-item"><div class="legend-swatch external"></div>External AI APIs (tier 1 only)</div>
+    <div class="legend-item"><div class="legend-swatch network-connected"></div>Connected</div>
+    <div class="legend-item"><div class="legend-swatch network-update"></div>Updates only</div>
+    <div class="legend-item"><div class="legend-swatch network-isolated"></div>Fully isolated</div>
+  </div>
+
+</div>
+</body>
+</html>
