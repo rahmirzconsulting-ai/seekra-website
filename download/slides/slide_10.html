@@ -26,49 +26,51 @@
 <body>
   <div class="slide slide-gray slide-10">
     <div class="eyebrow">DEPLOYMENT</div>
-    <h1 class="headline period-red">Three ways to run Seekra. You choose</h1>
-    <p class="lead">Seekra adapts to your infrastructure policy. Move between deployment models as your needs evolve — the platform stays the same.</p>
+    <h1 class="headline period-red">Three tiers. One platform. You choose</h1>
+    <p class="lead">Seekra runs in three deployment tiers — from cloud-native to fully air-gapped — so you choose exactly where the AI runs and how isolated your environment is. The platform stays the same; only the AI location and network exposure change.</p>
 
     <div class="card-grid">
-      <!-- Card 1: Cloud VM -->
+      <!-- Card 1: Cloud Native (Tier 01) -->
       <div class="side-card">
         <div class="icon-square side">
           <span class="material-icons" style="color: var(--tan); font-size: 36px;">cloud</span>
         </div>
-        <div class="card-title" style="color: var(--ink-strong);">Cloud VM</div>
-        <p class="card-body" style="color: var(--ink-2);">Runs on your own AWS, Azure, or Google Cloud account. You control the keys, the region, and the network. Data stays inside your tenant.</p>
-        <div class="card-label" style="margin-top: 18px;">STANDARD</div>
+        <div class="card-title" style="color: var(--ink-strong);">Cloud Native</div>
+        <p class="card-body" style="color: var(--ink-2);">Seekra runs in your cloud tenant and can leverage industry-leading external AI models — ChatGPT, Gemini, Claude — with PII automatically masked before any external call. Best AI capability, fastest to deploy.</p>
+        <div class="card-label" style="margin-top: 18px;">TIER 01 · FASTEST</div>
       </div>
 
-      <!-- Card 2: Air-gapped (Featured) -->
+      <!-- Card 2: Self-Hosted (Tier 02) -->
+      <div class="side-card">
+        <div class="icon-square side">
+          <span class="material-icons" style="color: var(--tan); font-size: 36px;">dns</span>
+        </div>
+        <div class="card-title" style="color: var(--ink-strong);">Self-Hosted</div>
+        <p class="card-body" style="color: var(--ink-2);">Seekra runs entirely on your own infrastructure — cloud VM or on-premises servers — with AI models hosted locally. Full data sovereignty. Nothing leaves your network.</p>
+        <div class="card-label" style="margin-top: 18px;">TIER 02 · SOVEREIGN</div>
+      </div>
+
+      <!-- Card 3: Air-Gapped (Tier 03, Featured) -->
       <div class="featured-card">
         <div class="featured-glow" data-decor aria-hidden="true"></div>
         <div class="icon-square featured" style="position: relative; z-index: 1;">
           <span class="material-icons" style="color: var(--tan); font-size: 36px;">shield_lock</span>
         </div>
-        <div class="card-title" style="color: var(--cream); position: relative; z-index: 1;">Air-gapped / offline</div>
-        <p class="card-body" style="color: rgba(231,230,228,0.78); position: relative; z-index: 1;">Fully isolated. No external network connection required. The strongest possible deployment for classified, regulated, or sovereign workloads.</p>
-        <div class="card-label" style="margin-top: 18px; position: relative; z-index: 1;">FEATURED · MOST SECURE</div>
-      </div>
-
-      <!-- Card 3: On-premises -->
-      <div class="side-card">
-        <div class="icon-square side">
-          <span class="material-icons" style="color: var(--tan); font-size: 36px;">storage</span>
-        </div>
-        <div class="card-title" style="color: var(--ink-strong);">On-premises</div>
-        <p class="card-body" style="color: var(--ink-2);">Installed on servers inside your data center. No traffic to any external cloud. Operates inside your existing security perimeter.</p>
-        <div class="card-label" style="margin-top: 18px;">STANDARD</div>
+        <div class="card-title" style="color: var(--cream); position: relative; z-index: 1;">Air-Gapped</div>
+        <p class="card-body" style="color: rgba(231,230,228,0.78); position: relative; z-index: 1;">Fully isolated self-hosted deployment with no external network connection. For classified, sovereign, or maximum-security workloads where even update traffic is not permitted.</p>
+        <div class="card-label" style="margin-top: 18px; position: relative; z-index: 1;">TIER 03 · MAXIMUM SECURITY</div>
       </div>
     </div>
 
-    <div class="footnote">No pricing is published. Deployment model and scale are discussed in person during the demo.</div>
+    <div class="footnote">No pricing is published. Deployment tier and scale are discussed in person during the demo.</div>
   </div>
 
   <aside data-notes class="hidden">
-    • Three deployment options, one platform — migration between models is straightforward.
-    • Most clients start with Cloud VM for evaluation, then move to On-premises or Air-gapped for production.
-    • Air-gapped is the differentiator for Gulf government — emphasize this is real today, not a roadmap item.
+    • Three deployment tiers, one platform — the same Seekra application, PII masking, and document store across all tiers; only the AI location and network exposure change.
+    • Tier 01 Cloud Native: fastest to deploy, leverages best-in-class external AI models with PII masking as the protection layer. Good for evaluation and for organizations not ready to host AI locally.
+    • Tier 02 Self-Hosted: full data sovereignty, AI runs locally on your infrastructure (cloud VM or on-prem), no AI traffic leaves your network.
+    • Tier 03 Air-Gapped: maximum security for classified/sovereign workloads. No external network at all — updates via physical media or data diode.
+    • Most clients start with Cloud Native for evaluation, then upgrade to Self-Hosted or Air-Gapped for production as their sovereignty requirements mature.
     • Pricing is always discussed in person during the demo, never published.
   </aside>
 </body>
