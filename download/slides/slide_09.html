@@ -14,6 +14,7 @@
     overflow: hidden;
     margin-top: 22px;
   }
+  table.compare { font-family: var(--font-poppins); }
   table.compare th, table.compare td {
     padding: 12px 18px;
     text-align: left;
@@ -25,7 +26,7 @@
     letter-spacing: 0.14em;
     text-transform: uppercase;
     font-weight: 600;
-    color: #3D2B1D;
+    color: #1F1A14;
     border-bottom: 1px solid rgba(61,43,29,0.12);
   }
   table.compare tbody tr:nth-child(odd) td { background: rgba(61,43,29,0.025); }
@@ -34,7 +35,7 @@
     color: #1F1A14;
     line-height: 1.45;
   }
-  table.compare td.col-feature { font-weight: 500; color: #3D2B1D; }
+  table.compare td.col-feature { font-weight: 500; color: #1F1A14; }
   .yes { color: #B59876; font-weight: 600; }
   .no  { color: #B93C32; font-weight: 600; }
   .partial { color: #4A3F33; font-weight: 500; font-style: italic; }
@@ -45,7 +46,7 @@
   <div class="h-full flex flex-col">
     <div>
       <div class="eyebrow">HOW SEEKRA COMPARES</div>
-      <h1 style="font-family: var(--font-heading); font-weight: 700; font-size: 42px; line-height: 1.15; letter-spacing: -0.02em; color: #3D2B1D; margin-top: 14px;">
+      <h1 style="font-family: var(--font-heading); font-weight: 700; font-size: 42px; line-height: 1.15; letter-spacing: -0.02em; color: #1F1A14; margin-top: 14px;">
         An honest comparison<span style="color: #B93C32;">.</span>
       </h1>
       <p style="font-weight: 400; font-size: 16px; line-height: 1.55; color: #4A3F33; margin-top: 12px; max-width: 880px;">
@@ -73,7 +74,7 @@
             <td><span class="no">&#10007; No</span></td>
           </tr>
           <tr>
-            <td class="col-feature">PII masked before AI</td>
+            <td class="col-feature">PII masked at source</td>
             <td><span class="yes">&#10003; Yes</span></td>
             <td><span class="partial">Partial</span></td>
           </tr>
@@ -88,7 +89,7 @@
             <td><span class="partial">Partial</span></td>
           </tr>
           <tr>
-            <td class="col-feature">Arabic &amp; Urdu voice (first-class)</td>
+            <td class="col-feature">Arabic voice (first-class)</td>
             <td><span class="yes">&#10003; Yes</span></td>
             <td><span class="partial">Partial</span></td>
           </tr>

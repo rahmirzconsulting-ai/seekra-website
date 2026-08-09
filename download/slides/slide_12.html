@@ -18,7 +18,7 @@
       pointer-events: none;
     }
     .slide-12 .top-block { max-width: 900px; position: relative; z-index: 1; }
-    .slide-12 .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: var(--tan); }
+    .slide-12 .eyebrow { font-size: 13px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: var(--tan); }
     .slide-12 .headline { font-family: var(--font-heading); font-weight: 700; font-size: 48px; line-height: 1.12; letter-spacing: -0.025em; color: var(--cream); margin-top: 14px; }
     .slide-12 .lead { font-weight: 400; font-size: 15px; line-height: 1.6; color: rgba(231,230,228,0.72); margin-top: 16px; max-width: 880px; }
     .slide-12 .grid {
@@ -71,8 +71,8 @@
           <span class="numeral">02</span>
           <span class="material-icons" style="color: var(--tan); font-size: 22px;">visibility_off</span>
         </div>
-        <div class="card-title">PII masking before the AI</div>
-        <p class="card-body">Names, ID numbers, emails, and phone numbers redacted upstream of any AI call.</p>
+        <div class="card-title">PII masked at the source</div>
+        <p class="card-body">Names, ID numbers, emails, and phone numbers are automatically redacted. In air-gapped deployments the AI model itself runs locally — no data and no model ever leave your infrastructure.</p>
       </div>
 
       <!-- 03 -->
@@ -101,7 +101,7 @@
           <span class="numeral">05</span>
           <span class="material-icons" style="color: var(--tan); font-size: 22px;">translate</span>
         </div>
-        <div class="card-title">Arabic / Urdu / English parity</div>
+        <div class="card-title">Arabic / English parity</div>
         <p class="card-body">First-class Arabic with proper RTL and font shaping. Not a translated afterthought.</p>
       </div>
 
@@ -121,7 +121,8 @@
     • These six differentiators are all verifiable on day one of a pilot — invite the client to test any of them.
     • The differentiators compound: self-hosted + PII masking + cited answers is the bundle competitors cannot match.
     • Multimodal in one platform is rare — most vendors stitch three separate products together.
-    • Arabic / Urdu / English parity is structural, not a localized afterthought.
+    • Arabic / English parity is structural, not a localized afterthought.
+    • In air-gapped deployments the AI model itself runs on the customer’s own servers — no external dependency.
     • Transition: “Let’s talk about seeing Seekra on your own documents.”
   </aside>
 </body>

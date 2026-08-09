@@ -37,7 +37,7 @@
         Nothing leaves the box<span style="color: #B93C32; font-size: 80px; line-height: 0.6;">.</span>
       </h1>
       <p style="font-weight: 400; font-size: 17px; line-height: 1.6; color: rgba(231,230,228,0.78); margin-top: 22px; max-width: 860px;">
-        This is the decisive argument for government, legal, healthcare, and financial buyers. Seekra runs entirely on the customer&rsquo;s own infrastructure — cloud VM, on-premises, or fully air-gapped with no external network connection. Personal information is automatically detected and masked before any AI model is involved.
+        This is the decisive argument for government, legal, healthcare, and financial buyers. Seekra runs entirely on the customer&rsquo;s own infrastructure — cloud VM, on-premises, or fully air-gapped with no external network connection. Personal information is automatically detected and masked, and in air-gapped deployments the AI model itself runs locally on the customer&rsquo;s own servers — no data and no model ever leave the box.
       </p>
     </div>
     <div style="margin-top: 32px; display: grid; grid-template-columns: 540px 540px; column-gap: 24px; row-gap: 24px;">
@@ -51,8 +51,8 @@
       <div class="sec-card">
         <div class="sec-icon-box"><span class="material-icons">visibility_off</span></div>
         <div>
-          <div class="sec-title">PII masked before the AI</div>
-          <div class="sec-body">Names, ID numbers, emails, and phone numbers are automatically redacted before any text reaches the AI model.</div>
+          <div class="sec-title">PII masked at the source</div>
+          <div class="sec-body">Names, ID numbers, emails, and phone numbers are automatically redacted before any text is processed. In air-gapped deployments, the AI model itself runs locally on your servers — no data and no model ever leave your infrastructure.</div>
         </div>
       </div>
       <div class="sec-card">
@@ -76,7 +76,8 @@
   <ul>
     <li>Pause on the headline — let &ldquo;Nothing leaves the box&rdquo; land before moving on.</li>
     <li>Lead with air-gapped: the killer argument for Gulf government and classified workloads.</li>
-    <li>PII masking happens BEFORE the AI sees text — structural, not a setting.</li>
+    <li>In air-gapped mode the AI model itself runs on the customer&rsquo;s own servers — no external dependency.</li>
+    <li>PII is masked at the source — names, IDs, emails, phone numbers redacted before any processing.</li>
     <li>RBAC includes a read-only auditor role for oversight teams.</li>
     <li>Audit trail is complete enough for forensic reconstruction of any incident.</li>
   </ul>

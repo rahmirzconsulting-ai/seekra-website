@@ -4,19 +4,24 @@
     "style_name": "Premium Editorial (Apple-class, alternating dark/light chapters)",
     "palette": {
       "background": "#E7E6E4",
-      "primary": "#3D2B1D",
+      "primary": "#202020",
       "accent": "#B59876",
-      "charcoal": "#202020",
+      "cream": "#E7E6E4",
       "warm_gray": "#D8D6D3",
+      "charcoal": "#202020",
       "brick": "#B93C32"
     },
     "typography": {
-      "heading": "Inter (600-700 weight, tight tracking -0.02em)",
+      "heading": "Inter (700 weight, tight tracking -0.02em)",
       "body": "Inter (400-450 weight, line-height ~1.6)",
       "numeric": "JetBrains Mono",
+      "comparison_table": "Poppins (slide 9 only)",
       "arabic_fallback": "Noto Naskh Arabic"
     },
-    "reference": "Apple.com-class scrolling experience — cinematic spacing, one big idea per slide, alternating dark/light chapters, soft radial tan glows on dark surfaces, generous whitespace, no grid patterns."
+    "reference": "Apple.com-class scrolling experience — cinematic spacing, one big idea per slide, alternating dark/light chapters, soft radial tan glows on dark surfaces, generous whitespace, no grid patterns. Dark brown #3D2B1D removed per client direction; slide 8 background switched to charcoal. Eyebrows on light slides use #1F1A14 (ink-strong) for high visibility; eyebrows on dark slides remain tan.",
+    "logo_asset": "logo-seekra.png",
+    "name_meaning": "Seekra = Seek + era — a new era of seeking. Shown on cover slide.",
+    "client_focus": "Gulf region only — Urdu and Pakistani references removed throughout."
   },
   "global_css_path": "/home/z/my-project/download/slides/global.css",
   "slides_dir": "/home/z/my-project/download/slides",

@@ -1,21 +1,23 @@
 /* ============================================================
    Seekra — Product Profile · Global Stylesheet
-   Brand palette (mandatory, no substitutes):
-     #3D2B1D  dark brown   — primary brand color
+   Brand palette (mandatory):
      #B59876  tan / sand   — primary accent
      #E7E6E4  cream        — light section background
      #D8D6D3  warm gray    — secondary light / borders
      #202020  charcoal     — dark section base
      #B93C32  brick red    — sparing accent (period, X marks)
+   NOTE: dark brown #3D2B1D was removed per client direction
+         (slide 8 background replaced with charcoal).
    Typography: Inter (heading + body), JetBrains Mono (numeric),
-   Noto Naskh Arabic (Arabic accent fallback).
+   Noto Naskh Arabic (Arabic accent fallback), Poppins (slide 9 table).
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Naskh+Arabic:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Naskh+Arabic:wght@400;500;700&family=Poppins:wght@400;500;600;700&display=swap');
 
 :root {
-  /* Palette */
-  --brown:      #3D2B1D;
+  /* Palette — dark brown #3D2B1D REMOVED per client direction.
+     Light-slide headings now use --ink-strong (#1F1A14) instead of brown.
+     Dark-slide surfaces use --charcoal (#202020). */
   --tan:        #B59876;
   --tan-soft:   #C9B498;
   --cream:      #E7E6E4;
@@ -24,6 +26,7 @@
   --charcoal-2: #1A1A1A;
   --brick:      #B93C32;
   --ink:        #1F1A14;
+  --ink-strong: #1F1A14;   /* used for light-slide headings & labels (replaces brown) */
   --ink-2:      #4A3F33;
   --muted-dark: rgba(231, 230, 228, 0.62);
   --muted-light: rgba(61, 43, 29, 0.62);
@@ -36,6 +39,7 @@
   --font-cn:      'Inter', 'Noto Naskh Arabic', sans-serif;
   --font-num:     'JetBrains Mono', 'Inter', monospace;
   --font-ar:      'Noto Naskh Arabic', 'Inter', serif;
+  --font-poppins: 'Poppins', 'Inter', sans-serif;   /* used on slide 9 comparison table */
 
   /* Type scale */
   --fs-display: 92px;
@@ -74,7 +78,7 @@ html, body { background: #2a2a2a; }
 
 /* ---- Theme surfaces ---- */
 .slide-dark   { background: var(--charcoal); color: var(--cream); }
-.slide-brown  { background: var(--brown);    color: var(--cream); }
+.slide-brown  { background: var(--charcoal); color: var(--cream); }  /* brown removed — now charcoal */
 .slide-light  { background: var(--cream);    color: var(--ink); }
 .slide-gray   { background: var(--warm-gray); color: var(--ink); }
 
@@ -172,10 +176,21 @@ html, body { background: #2a2a2a; }
 
 /* ---- Section anchor line (premium editorial) ---- */
 .eyebrow {
-  font-size: var(--fs-micro);
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   letter-spacing: 0.22em;
   text-transform: uppercase;
+  color: var(--tan);
+}
+/* Darker, bolder eyebrow for LIGHT slides so the label is highly visible */
+.slide-light .eyebrow,
+.slide-gray .eyebrow {
+  color: #1F1A14;
+  font-weight: 700;
+}
+/* Keep tan eyebrow on DARK slides */
+.slide-dark .eyebrow,
+.slide-brown .eyebrow {
   color: var(--tan);
 }
 
@@ -184,6 +199,7 @@ table.compare {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--fs-small);
+  font-family: var(--font-poppins);   /* Poppins on slide 9 per client direction */
 }
 table.compare th, table.compare td {
   padding: 12px 16px;
@@ -196,9 +212,10 @@ table.compare thead th {
   text-transform: uppercase;
   font-weight: 600;
   border-bottom: 1px solid var(--hair-light);
+  color: var(--ink-strong);
 }
 table.compare tbody tr + tr td { border-top: 1px solid var(--hair-light); }
-table.compare td.col-feature { font-weight: 500; }
+table.compare td.col-feature { font-weight: 500; color: var(--ink-strong); }
 .yes { color: var(--tan); font-weight: 600; }
 .no  { color: var(--brick); font-weight: 600; }
 .partial { color: var(--ink-2); font-weight: 500; font-style: italic; }
