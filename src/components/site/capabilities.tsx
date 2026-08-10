@@ -15,6 +15,7 @@ const CAPABILITIES = [
     ],
     icon: MessageSquare,
     visual: <AskVisual />,
+    reverse: false,
   },
   {
     id: 'see',
@@ -44,6 +45,7 @@ const CAPABILITIES = [
     ],
     icon: Mic,
     visual: <SpeakVisual />,
+    reverse: false,
   },
 ] as const;
 
