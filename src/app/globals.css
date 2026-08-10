@@ -171,10 +171,10 @@ html {
 }
 .seekra-eyebrow-ink {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--seekra-ink);
+  color: var(--seekra-brick);
 }
 .seekra-period::after {
   content: '.';

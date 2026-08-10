@@ -34,7 +34,7 @@ export function UseCases() {
     <section className="py-20 lg:py-28 bg-[#E7E6E4] text-[#1F1A14] border-t border-black/[0.06]">
       <div className="mx-auto max-w-7xl px-6 lg:px-10">
         <Reveal className="max-w-3xl mb-10 lg:mb-12">
-          <div className="text-[13px] font-bold tracking-[0.22em] uppercase text-[#1F1A14] mb-3">
+          <div className="seekra-eyebrow-ink mb-3">
             Who Seekra Is Built For
           </div>
           <h2 className="font-bold tracking-tight text-[#1F1A14]"

@@ -76,8 +76,8 @@ export function Hero() {
           </div>
 
           {/* Hero headline */}
-          <h1 className="font-bold tracking-tight text-[#E7E6E4] leading-[1.02]"
-              style={{ fontSize: 'clamp(40px, 6.4vw, 84px)', letterSpacing: '-0.025em' }}>
+          <h1 className="font-bold tracking-tight text-[#E7E6E4] leading-[1.08]"
+              style={{ fontSize: 'clamp(30px, 3.8vw, 54px)', letterSpacing: '-0.022em', maxWidth: '600px' }}>
             Your documents finally{' '}
             <span className="text-[#B59876]">answer back</span>
             <span className="text-[#B93C32]" style={{ fontSize: '1.1em' }}>.</span>
