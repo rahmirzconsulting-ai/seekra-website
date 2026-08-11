@@ -24,7 +24,7 @@ const PROBLEMS = [
 
 export function Problem() {
   return (
-    <section className="py-24 lg:py-32 bg-[#E7E6E4] text-[#1F1A14]">
+    <section className="py-24 lg:py-32 bg-white text-[#1F1A14]">
       <div className="mx-auto max-w-7xl px-6 lg:px-10">
         <Reveal className="max-w-3xl mb-12 lg:mb-16">
           <div className="seekra-eyebrow-ink mb-3">

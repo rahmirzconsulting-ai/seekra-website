@@ -83,37 +83,20 @@ export function Hero() {
             <span className="text-[#B93C32]" style={{ fontSize: '1.1em' }}>.</span>
           </h1>
 
-          {/* Hero subline */}
-          <p className="mt-6 text-[17px] lg:text-[19px] leading-[1.55] text-[#E7E6E4]/75 max-w-[640px]">
-            Seekra is content-aware intelligence that runs on your infrastructure. Ask, see, and speak to your archive — every answer cited to its source.
+          {/* Hero subline — punchier, names specific document types, states the core feature */}
+          <p className="mt-6 text-[16px] lg:text-[18px] leading-[1.6] text-[#E7E6E4]/78 max-w-[600px]">
+            Upload your contracts, policies, case files, and scans — Seekra turns them into a private assistant you can <span className="text-[#E7E6E4] font-medium">ask</span>, <span className="text-[#E7E6E4] font-medium">search by image</span>, or <span className="text-[#E7E6E4] font-medium">speak to</span> in Arabic or English. Every answer is cited to the exact source page, and nothing leaves your infrastructure.
           </p>
 
-          {/* Name meaning callout */}
-          <div className="mt-5 inline-flex items-center gap-3 px-4 py-2.5 rounded-lg bg-[#B59876]/10 border border-[#B59876]/30 border-l-[3px] border-l-[#B59876]">
-            <span className="text-[11px] font-bold tracking-[0.22em] uppercase text-[#B59876]">
-              The name
-            </span>
-            <span className="text-[16px] lg:text-[17px] font-medium text-[#E7E6E4]">
-              <span className="font-bold text-[#B59876]">Seek</span>
-              <span className="text-[#B93C32] font-bold mx-1">+</span>
-              <span className="font-bold text-[#B59876]">era</span>
-              <span className="text-[#E7E6E4]/80 ml-2">— a new era of seeking.</span>
-            </span>
-          </div>
-
-          {/* Floating glass chips */}
+          {/* Floating glass chips — reduced to 2 trust signals not already in the subline */}
           <div className="mt-7 flex flex-wrap gap-2.5">
             {[
-              { icon: '✓', text: 'Cited answers' },
-              { text: 'العربية · English', arabic: true },
-              { icon: '▣', text: '100% visual match' },
               { icon: '⛨', text: 'Air-gapped ready' },
+              { icon: '▣', text: '100% visual match' },
             ].map((chip, i) => (
               <span
                 key={i}
-                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[13px] font-medium bg-[#E7E6E4]/[0.06] border border-[#E7E6E4]/15 text-[#E7E6E4] ${
-                  chip.arabic ? 'font-arabic' : ''
-                }`}
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[13px] font-medium bg-[#E7E6E4]/[0.06] border border-[#E7E6E4]/15 text-[#E7E6E4]"
               >
                 {chip.icon && <span className="text-[#B59876]">{chip.icon}</span>}
                 {chip.text}
