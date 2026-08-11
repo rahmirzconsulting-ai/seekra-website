@@ -194,13 +194,11 @@ export function Contact() {
                   Live app demo
                 </div>
                 <a
-                  href={SITE_CONFIG.appUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href={SITE_CONFIG.appBridgeUrl}
                   className="inline-flex items-center gap-3 text-[#E7E6E4] hover:text-[#B59876] transition-colors group"
                 >
                   <ArrowRight className="w-5 h-5 text-[#B59876] flex-shrink-0" />
-                  <span className="text-[15px] font-medium">app.seekra.pk</span>
+                  <span className="text-[15px] font-medium">Launch live demo</span>
                 </a>
               </div>
               <div className="text-[12px] text-[#E7E6E4]/55 leading-[1.5]">

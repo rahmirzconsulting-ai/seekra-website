@@ -31,9 +31,7 @@ export function Footer() {
             <a href="#deployment" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Deployment</a>
             <a href="#contact" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Contact</a>
             <a
-              href={SITE_CONFIG.appUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={SITE_CONFIG.appBridgeUrl}
               className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors"
             >
               Launch App

@@ -64,9 +64,7 @@ export function Navbar() {
         {/* Desktop CTA buttons */}
         <div className="hidden lg:flex items-center gap-3">
           <a
-            href={SITE_CONFIG.appUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+            href={SITE_CONFIG.appBridgeUrl}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-[#E7E6E4] border border-[#E7E6E4]/30 hover:border-[#B59876]/60 hover:text-[#B59876] transition-all"
           >
             Launch App
@@ -108,9 +106,7 @@ export function Navbar() {
             ))}
             <li className="pt-3 space-y-2">
               <a
-                href={SITE_CONFIG.appUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={SITE_CONFIG.appBridgeUrl}
                 className="block w-full text-center py-3 rounded-full text-sm font-medium text-[#E7E6E4] border border-[#E7E6E4]/30"
                 onClick={() => setMenuOpen(false)}
               >
