@@ -2,165 +2,143 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Seekra — Cover</title>
+  <title>Seekra — App Profile · Cover</title>
+  <link rel="stylesheet" href="global.css">
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="global.css">
   <style>
-    .top-eyebrow {
-      font-family: var(--font-body);
+    /* Cover-specific composition */
+    .cover-center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      z-index: 2;
+    }
+    .cover-logo {
+      width: 96px;
+      height: 96px;
+      border-radius: 14px;
+      object-fit: cover;
+      display: block;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+    }
+    .cover-glow {
+      position: absolute;
+      width: 560px;
+      height: 560px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(181,152,118,0.22) 0%, rgba(181,152,118,0.10) 35%, rgba(181,152,118,0) 70%);
+      pointer-events: none;
+      filter: blur(6px);
+      z-index: 1;
+    }
+    .cover-wordmark {
+      font-family: var(--font-heading);
       font-weight: 700;
-      font-size: 12px;
+      font-size: 80px;
+      color: var(--cream);
+      letter-spacing: -0.025em;
+      line-height: 1;
+      margin-top: 32px;
+    }
+    .cover-divider {
+      width: 64px;
+      height: 2px;
+      background: var(--tan);
+      margin-top: 32px;
+    }
+    .cover-subtitle {
+      font-family: var(--font-heading);
+      font-weight: 500;
+      font-size: 28px;
       color: var(--tan);
       letter-spacing: 0.22em;
       text-transform: uppercase;
+      margin-top: 32px;
+      line-height: 1;
     }
-    .hero-headline {
-      font-family: var(--font-heading);
-      font-weight: 700;
-      font-size: 84px;
-      line-height: 1.05;
-      letter-spacing: -0.025em;
-      color: var(--cream);
-    }
-    .hero-headline .accent { color: var(--tan); }
-    .hero-headline .period-big {
-      color: var(--brick);
-      font-size: 96px;
-      line-height: 0.9;
-    }
-    .hero-sub {
+    .cover-version {
       font-family: var(--font-body);
       font-weight: 400;
-      font-size: 19px;
-      line-height: 1.55;
-      color: rgba(231,230,228,0.78);
-      max-width: 760px;
+      font-size: 16px;
+      color: rgba(231,230,228,0.60);
+      margin-top: 16px;
+      letter-spacing: 0.02em;
     }
-    .meaning-block {
-      margin-top: 22px;
-      padding: 16px 22px;
-      background: rgba(181,152,118,0.10);
-      border: 1px solid rgba(181,152,118,0.30);
-      border-left: 3px solid var(--tan);
-      border-radius: 8px;
-      max-width: 760px;
-    }
-    .meaning-label {
-      font-family: var(--font-body);
-      font-weight: 700;
-      font-size: 11px;
+    .cover-version .sep {
       color: var(--tan);
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
+      padding: 0 6px;
     }
-    .meaning-text {
-      font-family: var(--font-heading);
-      font-weight: 500;
-      font-size: 18px;
-      color: var(--cream);
-      margin-top: 6px;
-      line-height: 1.45;
-    }
-    .meaning-text .word-seek {
-      font-weight: 700;
-      color: var(--tan);
-    }
-    .meaning-text .word-era {
-      font-weight: 700;
-      color: var(--tan);
-    }
-    .meaning-text .plus {
-      color: var(--brick);
-      font-weight: 700;
-      margin: 0 4px;
-    }
-    .glass-chip {
-      background: rgba(231,230,228,0.06);
-      border: 1px solid rgba(231,230,228,0.16);
-      padding: 6px 14px;
-      border-radius: 999px;
-      font-family: var(--font-body);
-      font-weight: 500;
-      font-size: 13px;
-      color: var(--cream);
-      display: inline-flex;
+    .cover-footer {
+      position: absolute;
+      bottom: 48px;
+      left: 64px;
+      right: 64px;
+      display: flex;
       align-items: center;
-      gap: 6px;
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
+      justify-content: space-between;
+      z-index: 2;
     }
-    .glass-chip .material-icons { color: var(--tan); font-size: 16px !important; }
-    .glass-chip.ar { font-family: var(--font-ar); font-size: 15px; }
-    .footer-bar {
+    .cover-footer .meta {
       font-family: var(--font-body);
       font-weight: 500;
       font-size: 12px;
       color: rgba(231,230,228,0.50);
       letter-spacing: 0.10em;
       text-transform: uppercase;
+      line-height: 1;
     }
-    .wordmark {
-      font-family: var(--font-heading);
-      font-weight: 600;
-      font-size: 22px;
-      color: var(--cream);
-      letter-spacing: -0.01em;
+    .cover-footer .meta .sep {
+      color: var(--tan);
+      padding: 0 6px;
+    }
+    /* Subtle outer hairline frame for editorial formality */
+    .cover-frame {
+      position: absolute;
+      inset: 32px;
+      border: 1px solid rgba(231,230,228,0.06);
+      pointer-events: none;
+      z-index: 1;
     }
   </style>
 </head>
 <body>
-  <div class="slide slide-dark">
-    <!-- Decorative tan glow top-left -->
-    <div class="glow-tan tl" data-decor aria-hidden="true"></div>
+  <section class="slide slide-dark">
+    <!-- decorative radial tan glow centered behind the logo -->
+    <div class="cover-glow" data-decor aria-hidden="true"></div>
+    <div class="cover-frame" data-decor aria-hidden="true"></div>
 
-    <!-- Top bar: logo lockup (left) + eyebrow (right) -->
-    <div class="flex items-center justify-between" style="position:relative; z-index:2;">
-      <div class="flex items-center" style="gap:12px;">
-        <img src="logo-seekra.png" alt="Seekra logo" class="logo-mark">
-        <span class="wordmark">Seekra</span>
-      </div>
-      <div class="top-eyebrow">Content-Aware Intelligence</div>
-    </div>
-
-    <!-- Hero block: vertically centered, left-aligned -->
-    <div style="position:absolute; left:64px; right:64px; top:50%; transform:translateY(-50%); z-index:2;">
-      <h1 class="hero-headline">
-        Your documents finally <span class="accent">answer back</span><span class="period-big">.</span>
-      </h1>
-      <p class="hero-sub" style="margin-top:24px;">
-        Seekra is content-aware intelligence that runs entirely on your infrastructure. Ask, see, and speak to your archive — every answer cited to its source.
-      </p>
-
-      <!-- Seekra name meaning block -->
-      <div class="meaning-block">
-        <div class="meaning-label">The name</div>
-        <div class="meaning-text">
-          <span class="word-seek">Seek</span><span class="plus">+</span><span class="word-era">era</span> — a new era of seeking.
-        </div>
-      </div>
-
-      <!-- Floating glass chips -->
-      <div class="flex flex-wrap" style="gap:10px; margin-top:24px; max-width:760px;">
-        <span class="glass-chip"><span class="material-icons">verified</span>Cited answers</span>
-        <span class="glass-chip ar">العربية · English</span>
-        <span class="glass-chip"><span class="material-icons">image_search</span>100% visual match</span>
-        <span class="glass-chip"><span class="material-icons">shield</span>Air-gapped ready</span>
+    <!-- centered brand + document type lockup -->
+    <div class="cover-center">
+      <img src="logo-seekra.png" alt="Seekra logo" class="cover-logo">
+      <div class="cover-wordmark">Seekra</div>
+      <div class="cover-divider" data-decor aria-hidden="true"></div>
+      <div class="cover-subtitle">App Profile</div>
+      <div class="cover-version">
+        Version 1.0<span class="sep">·</span>2026
       </div>
     </div>
 
-    <!-- Footer bar -->
-    <div class="footer-bar" style="position:absolute; left:64px; right:64px; bottom:36px; z-index:2;">
-      Product Profile · 2026
+    <!-- bottom meta bar -->
+    <div class="cover-footer">
+      <div class="meta">Prepared for: Gulf Region Enterprise &amp; Government Buyers</div>
+      <div class="meta">© 2026 Seekra<span class="sep">·</span>seekra.pk</div>
     </div>
-  </div>
 
-  <aside data-notes class="hidden">
-    • Open with the name: "Seekra comes from Seek + era — a new era of seeking. The platform lets your archive finally answer back."
-    • Set expectations: this deck covers the problem, the Seekra approach, the four capabilities (Ask, See, Speak, Trust), deployment, security, and commercial model.
-    • Anchor on the headline — "Your documents finally answer back" — and pause for it to land before moving on.
-    • Preview the four capability pillars you will return to throughout: Ask, See, Speak, Trust.
-    • Transition: "Let's start with the executive summary — what Seekra is, in one slide."
-  </aside>
+    <aside data-notes class="hidden">
+      Talking points:
+      • Open by introducing this as Seekra's formal App Profile handbook — the authoritative document for this engagement.
+      • Note the version (1.0, 2026) and that it has been prepared specifically for Gulf Region enterprise and government buyers.
+      • Transition: "Let me walk you through what's inside — starting with the table of contents on the next slide."
+    </aside>
+  </section>
 </body>
 </html>

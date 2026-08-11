@@ -2,128 +2,226 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Seekra — Executive Summary</title>
+  <title>Seekra — App Profile · Contents</title>
+  <link rel="stylesheet" href="global.css">
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="global.css">
   <style>
-    .eyebrow-tan {
-      font-family: var(--font-body);
-      font-weight: 700;
+    .toc-wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    .toc-eyebrow {
+      font-family: var(--font-heading);
       font-size: 13px;
-      color: #1F1A14;
+      font-weight: 800;
       letter-spacing: 0.22em;
       text-transform: uppercase;
+      color: var(--brick);
+      line-height: 1;
     }
-    .exec-headline {
+    .toc-headline {
       font-family: var(--font-heading);
       font-weight: 700;
-      font-size: 48px;
-      line-height: 1.15;
-      letter-spacing: -0.02em;
-      color: var(--ink-strong);
-      max-width: 600px;
-      margin-top: 16px;
+      font-size: 56px;
+      line-height: 1.05;
+      letter-spacing: -0.025em;
+      color: #1F1A14;
+      margin-top: 12px;
     }
-    .exec-headline .accent { color: var(--tan); }
-    .exec-para {
+    .toc-headline .dot {
+      color: var(--brick);
+    }
+    .toc-lead {
       font-family: var(--font-body);
       font-weight: 400;
-      font-size: 17px;
-      line-height: 1.65;
-      color: var(--ink-2);
-      max-width: 580px;
+      font-size: 15px;
+      line-height: 1.55;
+      color: #4A3F33;
+      margin-top: 14px;
+      max-width: 720px;
     }
-    .cap-card {
-      width: 240px;
-      height: 140px;
-      background: #FFFFFF;
-      border: 1px solid rgba(61,43,29,0.12);
-      border-radius: 14px;
-      padding: 22px;
-      box-shadow: 0 1px 0 rgba(61,43,29,0.04);
+    .toc-list {
+      list-style: none;
+      padding: 0;
+      margin: 28px 0 0 0;
+      border-top: 1px solid var(--hair-light);
+    }
+    .toc-list li {
       display: flex;
-      flex-direction: column;
-      justify-content: flex-start;
+      align-items: center;
+      height: 32px;
+      border-bottom: 1px solid var(--hair-light);
     }
-    .cap-card .material-icons {
-      color: var(--tan);
-      font-size: 28px !important;
-    }
-    .cap-label {
+    .toc-num {
       font-family: var(--font-heading);
       font-weight: 600;
-      font-size: 13px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--ink-strong);
-      margin-top: 10px;
+      font-size: 22px;
+      color: var(--tan);
+      width: 56px;
+      flex-shrink: 0;
+      font-feature-settings: 'tnum' 1, 'lnum' 1;
+      letter-spacing: -0.01em;
+      line-height: 1;
     }
-    .cap-desc {
+    .toc-title {
+      font-family: var(--font-heading);
+      font-weight: 500;
+      font-size: 18px;
+      color: #1F1A14;
+      flex-shrink: 0;
+      line-height: 1;
+      letter-spacing: -0.005em;
+    }
+    .toc-leader {
+      flex: 1 1 auto;
+      height: 0;
+      border-bottom: 1px dotted rgba(181, 152, 118, 0.40);
+      margin: 0 16px;
+    }
+    .toc-page {
+      font-family: var(--font-heading);
+      font-weight: 500;
+      font-size: 18px;
+      color: #1F1A14;
+      font-feature-settings: 'tnum' 1, 'lnum' 1;
+      flex-shrink: 0;
+      min-width: 28px;
+      text-align: right;
+      line-height: 1;
+    }
+    .toc-footer {
+      position: absolute;
+      bottom: 28px;
+      left: 0;
+      right: 0;
+      text-align: center;
       font-family: var(--font-body);
       font-weight: 400;
-      font-size: 13px;
-      color: var(--ink-2);
-      line-height: 1.4;
-      margin-top: 4px;
+      font-style: italic;
+      font-size: 11px;
+      color: #4A3F33;
+      letter-spacing: 0.02em;
+    }
+    .toc-footer .sep {
+      color: var(--tan);
+      padding: 0 4px;
+      font-style: normal;
+    }
+    /* faint corner mark for editorial formality */
+    .corner-mark {
+      position: absolute;
+      top: 28px;
+      right: 32px;
+      font-family: var(--font-heading);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(31, 26, 20, 0.45);
     }
   </style>
 </head>
 <body>
-  <div class="slide slide-light">
-    <div class="flex h-full" style="gap:0;">
-      <!-- LEFT COLUMN: 60% -->
-      <div style="width:60%; padding-right:48px; display:flex; flex-direction:column; justify-content:center;">
-        <div class="eyebrow-tan">Executive Summary</div>
-        <h1 class="exec-headline">
-          One platform. Your entire archive. <span class="accent">Your rules.</span>
-        </h1>
-        <p class="exec-para" style="margin-top:28px;">
-          Seekra is a content-aware intelligence platform that gives your organization a private assistant for its documents. Seekra runs in three deployment tiers — from cloud-native (using industry-leading external AI models with PII masking) to fully self-hosted and air-gapped. Organizations upload their documents — contracts, policies, case files, scanned images, field photographs — and Seekra lets their staff ask questions in natural language, search by image, and speak to the archive in Arabic or English.
-        </p>
-        <p class="exec-para" style="margin-top:16px;">
-          Every answer carries numbered citations that link directly to the exact source page. Personal information is automatically masked before any AI model is involved. Role-based access controls and a complete audit trail make Seekra suitable for the most regulated Gulf environments — across all three deployment tiers.
-        </p>
-      </div>
+  <section class="slide slide-light">
+    <div class="corner-mark" data-decor aria-hidden="true">Seekra · App Profile</div>
 
-      <!-- RIGHT COLUMN: 40%, vertically centered -->
-      <div style="width:40%; display:flex; align-items:center; justify-content:center;">
-        <div style="display:grid; grid-template-columns: 240px 240px; grid-template-rows: 140px 140px; gap:24px;">
-          <!-- Card 1 -->
-          <div class="cap-card">
-            <span class="material-icons">forum</span>
-            <div class="cap-label">Ask</div>
-            <div class="cap-desc">Conversational Q&amp;A with citations</div>
-          </div>
-          <!-- Card 2 -->
-          <div class="cap-card">
-            <span class="material-icons">image_search</span>
-            <div class="cap-label">See</div>
-            <div class="cap-desc">Search the archive with a photograph</div>
-          </div>
-          <!-- Card 3 -->
-          <div class="cap-card">
-            <span class="material-icons">mic</span>
-            <div class="cap-label">Speak</div>
-            <div class="cap-desc">Arabic-first voice interaction</div>
-          </div>
-          <!-- Card 4 -->
-          <div class="cap-card">
-            <span class="material-icons">shield</span>
-            <div class="cap-label">Trust</div>
-            <div class="cap-desc">Three deployment tiers — your choice</div>
-          </div>
-        </div>
-      </div>
+    <div class="toc-wrap">
+      <div class="toc-eyebrow">Contents</div>
+      <h1 class="toc-headline">Everything in this profile, in order<span class="dot">.</span></h1>
+      <p class="toc-lead">Thirteen sections, top to bottom. Read in order for the full picture, or jump to a section if you are looking for something specific.</p>
+
+      <ol class="toc-list">
+        <li>
+          <span class="toc-num">01</span>
+          <span class="toc-title">Executive Summary</span>
+          <span class="toc-leader" data-decor aria-hidden="true"></span>
+          <span class="toc-page">4</span>
+        </li>
+        <li>
+          <span class="toc-num">02</span>
+          <span class="toc-title">Why Seekra Exists</span>
+          <span class="toc-leader" data-decor aria-hidden="true"></span>
+          <span class="toc-page">5</span>
+        </li>
+        <li>
+          <span class="toc-num">03</span>
+          <span class="toc-title">The Seekra Approach</span>
+          <span class="toc-leader" data-decor aria-hidden="true"></span>
+          <span class="toc-page">6</span>
+        </li>
+        <li>
+          <span class="toc-num">04</span>
+          <span class="toc-title">Capability 01 — Ask</span>
+          <span class="toc-leader" data-decor aria-hidden="true"></span>
+          <span class="toc-page">7</span>
+        </li>
+        <li>
+          <span class="toc-num">05</span>
+          <span class="toc-title">Capability 02 — See</span>
+          <span class="toc-leader" data-decor aria-hidden="true"></span>
+          <span class="toc-page">8</span>
+        </li>
+        <li>
+          <span class="toc-num">06</span>
+          <span class="toc-title">Capability 03 — Speak</span>
+          <span class="toc-leader" data-decor aria-hidden="true"></span>
+          <span class="toc-page">9</span>
+        </li>
+        <li>
+          <span class="toc-num">07</span>
+          <span class="toc-title">Trust &amp; Sovereignty</span>
+          <span class="toc-leader" data-decor aria-hidden="true"></span>
+          <span class="toc-page">10</span>
+        </li>
+        <li>
+          <span class="toc-num">08</span>
+          <span class="toc-title">Capability Comparison</span>
+          <span class="toc-leader" data-decor aria-hidden="true"></span>
+          <span class="toc-page">11</span>
+        </li>
+        <li>
+          <span class="toc-num">09</span>
+          <span class="toc-title">Deployment Options</span>
+          <span class="toc-leader" data-decor aria-hidden="true"></span>
+          <span class="toc-page">12</span>
+        </li>
+        <li>
+          <span class="toc-num">10</span>
+          <span class="toc-title">Use Cases — Gulf Regulated Sectors</span>
+          <span class="toc-leader" data-decor aria-hidden="true"></span>
+          <span class="toc-page">13</span>
+        </li>
+        <li>
+          <span class="toc-num">11</span>
+          <span class="toc-title">Why Seekra — Differentiators</span>
+          <span class="toc-leader" data-decor aria-hidden="true"></span>
+          <span class="toc-page">14</span>
+        </li>
+        <li>
+          <span class="toc-num">12</span>
+          <span class="toc-title">Get in Touch</span>
+          <span class="toc-leader" data-decor aria-hidden="true"></span>
+          <span class="toc-page">15</span>
+        </li>
+        <li>
+          <span class="toc-num">13</span>
+          <span class="toc-title">Appendix — Deployment Architecture</span>
+          <span class="toc-leader" data-decor aria-hidden="true"></span>
+          <span class="toc-page">16</span>
+        </li>
+      </ol>
     </div>
-  </div>
 
-  <aside data-notes class="hidden">
-    • One sentence: Seekra is a content-aware intelligence platform that runs entirely on the customer's own infrastructure.
-    • Three input modes — text (Ask), image (See), and voice (Speak) — work across the same archive.
-    • Every answer is verifiable: numbered citations deep-link to the exact source page in the built-in viewer.
-    • PII is automatically masked before any AI model is involved — privacy by design, not by policy.
-    • Deployment options include fully air-gapped for the most regulated Gulf environments.
-  </aside>
+    <div class="toc-footer">Seekra<span class="sep">·</span>App Profile v1.0<span class="sep">·</span>2026</div>
+
+    <aside data-notes class="hidden">
+      Talking points:
+      • Introduce the structure: thirteen sections across roughly sixteen slides, designed to read top-to-bottom.
+      • Frame the four narrative chunks — problem (why Seekra exists), approach, the three capabilities (Ask, See, Speak), then trust &amp; deployment.
+      • Invite the client to jump to any specific section if they want to focus on a particular topic instead of reading linearly.
+    </aside>
+  </section>
 </body>
 </html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Seekra — Appendix · Deployment Architecture</title>
+  <link rel="stylesheet" href="global.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    .slide-14 {
+      padding: 32px 40px 28px !important;
+    }
+    .slide-14 .header-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 12px;
+    }
+    .slide-14 .eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--tan);
+    }
+    .slide-14 .page-tag {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(231, 230, 228, 0.55);
+    }
+    .slide-14 .caption {
+      font-size: 13px;
+      color: rgba(231, 230, 228, 0.75);
+      line-height: 1.5;
+      max-width: 1100px;
+      margin-bottom: 12px;
+    }
+    .slide-14 .diagram-wrap {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex: 1;
+    }
+    .slide-14 .diagram-wrap img {
+      max-width: 1200px;
+      width: 1200px;
+      height: auto;
+      max-height: 560px;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+    .slide-14 .footer-note {
+      position: absolute;
+      bottom: 18px;
+      left: 40px;
+      right: 40px;
+      text-align: center;
+      font-size: 11px;
+      color: rgba(231, 230, 228, 0.45);
+      letter-spacing: 0.06em;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide slide-dark slide-14">
+    <!-- Decorative tan glow top-right -->
+    <div class="glow-tan tr" data-decor aria-hidden="true"></div>
+
+    <div class="header-row" style="position: relative; z-index: 2;">
+      <div class="eyebrow">Appendix · Deployment Architecture</div>
+      <div class="page-tag">Reference</div>
+    </div>
+
+    <div class="caption" style="position: relative; z-index: 2;">
+      Three deployment tiers visualised side-by-side. The same Seekra application, PII masking layer, and document store run in all three tiers — only the AI model location and network exposure change.
+    </div>
+
+    <div class="diagram-wrap" style="position: relative; z-index: 2;">
+      <img src="seekra_deployment_architecture.png" alt="Seekra three-tier deployment architecture: Cloud Native, Self-Hosted, Air-Gapped">
+    </div>
+
+    <div class="footer-note">
+      Detailed architecture reference · See full-resolution diagram for additional detail
+    </div>
+  </div>
+
+  <aside data-notes class="hidden">
+    • This is a reference appendix slide — use it when the client asks for architectural detail beyond the 3-card overview on slide 10.
+    • Walk left-to-right: Cloud Native (external AI with PII masking) → Self-Hosted (local AI, your infrastructure) → Air-Gapped (local AI, fully isolated, updates via physical media).
+    • The dashed boundary in each tier is the customer perimeter — note how the AI box moves from outside (tier 1) to inside (tiers 2 & 3) the boundary.
+    • The network bar at the bottom of each tier is the key differentiator: connected (amber) → updates only (green) → fully isolated (brick red).
+    • If the client wants even more detail, offer to walk through a single tier in depth on a follow-up call.
+  </aside>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Seekra — Get in Touch</title>
+  <link rel="stylesheet" href="global.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    .slide-13 .center-glow {
+      position: absolute;
+      width: 900px; height: 900px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(181,152,118,0.22) 0%, rgba(181,152,118,0) 65%);
+      filter: blur(8px);
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .slide-13 .logo-lockup { position: absolute; top: 48px; left: 64px; display: flex; align-items: center; gap: 14px; z-index: 2; }
+    .slide-13 .logo-mark { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; }
+    .slide-13 .wordmark { font-family: var(--font-heading); font-weight: 600; font-size: 22px; color: var(--cream); letter-spacing: -0.01em; }
+    .slide-13 .center-block {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      max-width: 880px;
+      width: 880px;
+      text-align: left;
+      z-index: 2;
+    }
+    .slide-13 .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: var(--tan); }
+    .slide-13 .headline { font-family: var(--font-heading); font-weight: 700; font-size: 68px; line-height: 1.05; letter-spacing: -0.03em; color: var(--cream); margin-top: 16px; }
+    .slide-13 .headline .dot { color: var(--brick); }
+    .slide-13 .lead { font-weight: 400; font-size: 18px; line-height: 1.6; color: rgba(231,230,228,0.78); margin-top: 24px; max-width: 760px; }
+    .slide-13 .cta-row { display: flex; align-items: center; gap: 28px; margin-top: 36px; }
+    .slide-13 .cta-pill {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 18px 32px;
+      background: var(--tan);
+      color: var(--charcoal);
+      font-family: var(--font-heading);
+      font-weight: 600;
+      font-size: 16px;
+      letter-spacing: 0.02em;
+      border-radius: 999px;
+      text-decoration: none;
+    }
+    .slide-13 .email-block { display: flex; align-items: center; gap: 12px; }
+    .slide-13 .email-text { font-family: var(--font-body); font-weight: 500; font-size: 17px; color: var(--cream); letter-spacing: -0.005em; }
+    .slide-13 .email-sub { font-size: 12px; font-weight: 400; color: rgba(231,230,228,0.60); margin-top: 4px; }
+    .slide-13 .footer-bar {
+      position: absolute;
+      bottom: 36px;
+      left: 64px;
+      right: 64px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      color: rgba(231,230,228,0.50);
+      z-index: 2;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide slide-dark slide-13">
+    <div class="center-glow" data-decor aria-hidden="true"></div>
+
+    <!-- Logo lockup top-left -->
+    <div class="logo-lockup">
+      <img src="logo-seekra.png" alt="Seekra" class="logo-mark">
+      <span class="wordmark">Seekra</span>
+    </div>
+
+    <!-- Centered content -->
+    <div class="center-block">
+      <div class="eyebrow">SEE SEEKRA ON YOUR OWN DOCUMENTS</div>
+      <h1 class="headline">Tell us about your archive<span class="dot">.</span></h1>
+      <p class="lead">Arrange a live demo on a sample of your own documents. We will walk your team through Ask, See, Speak, and Trust — and answer every question about deployment, security, and integration.</p>
+
+      <div class="cta-row">
+        <a href="#" class="cta-pill">
+          Book a Demo
+          <span class="material-icons" style="font-size: 20px;">arrow_forward</span>
+        </a>
+
+        <div class="email-block">
+          <span class="material-icons" style="color: var(--tan); font-size: 22px;">mail</span>
+          <div>
+            <div class="email-text">rahmirz.consulting@gmail.com</div>
+            <div class="email-sub">Tell us about your archive and we’ll arrange a live demo.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer bar -->
+    <div class="footer-bar">SEEKRA · CONTENT-AWARE INTELLIGENCE FOR THE ENTERPRISE · © 2026</div>
+  </div>
+
+  <aside data-notes class="hidden">
+    • Close on the offer — a live demo run on the client’s own documents, not a canned one.
+    • Restate the four pillars (Ask, See, Speak, Trust) as the agenda for that demo.
+    • Hand the email over visibly and invite them to write to it on the spot.
+    • Thank them for their time and offer to follow up within 24 hours.
+  </aside>
+</body>
+</html>

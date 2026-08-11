@@ -1,0 +1,199 @@
+| Seekra |     |     |     | AI CONTENT-AWARE  | INTELLIGENCE |
+| ------ | --- | --- | --- | ----------------- | ------------ |
+Your documents finally
+answer back.
+THE NAME
+Seek+era—a new era of seeking.
+| ✓             |                  | ▣                 | ⛨                |     |     |
+| ------------- | ---------------- | ----------------- | ---------------- | --- | --- |
+| Cited answers | ةيبرعلا· English | 100% visual match | Air-gapped ready |     |     |
+
+EXECUTIVE SUMMARY
+One platform. Your entire
+| archive. Nothing |     |     |     |     | leaves the  |     |     |     |
+| ---------------- | --- | --- | --- | --- | ----------- | --- | --- | --- |
+the building.
+| Seekra is | a content-aware | intelligence |     | platform | that gives | your | organization | a private |
+| --------- | --------------- | ------------ | --- | -------- | ---------- | ---- | ------------ | --------- |
+◌ ▣
+| assistant | for its documents. |     | Seekra runs | in  | three deployment | tiers | - from | cloud-native |
+| --------- | ------------------ | --- | ----------- | --- | ---------------- | ----- | ------ | ------------ |
+(using industry-leading external AImodels with PIImasking) tofullyself-hosted andair- ASK SEE
+gapped. Organizations upload their documents - contracts, policies, case files, scanned Conversational Q&A with citations Search the archive with a
+citations photograph
+| images,fieldphotographs |     | - andSeekra |     | lets | theirstaffaskquestions |     | innatural | language, |
+| ----------------------- | --- | ----------- | --- | ---- | ---------------------- | --- | --------- | --------- |
+searchbyimage,andspeaktothearchiveinArabicorEnglish.
+◖ ⛨
+| Every answer | carries | numbered | citations | that | link directly | to  | the exact | source page. |
+| ------------ | ------- | -------- | --------- | ---- | ------------- | --- | --------- | ------------ |
+SPEAK TRUST
+Personal informationisautomaticallymaskedbefore anyAImodel isinvolved.Role-based Arabic-first voice interaction Self-hosted. Nothing leaves the
+the box.
+| access controls  | and a                     | complete | audit | trail make | Seekra | suitable | for the | most regulated |
+| ---------------- | ------------------------- | -------- | ----- | ---------- | ------ | -------- | ------- | -------------- |
+| Gulfenvironments | -acrossallthreedeployment |          |       |            | tiers. |          |         |                |
+
+WHY SEEKRA EXISTS
+Three problems every large archive suffers from
+| 01  | 02                              | 03                             |
+| --- | ------------------------------- | ------------------------------ |
+| ▣   |                                 | ?                              |
+|     | Cloud AI means data leaves the  | Answers without sources can’t  |
+Knowledge buried in files
+|     | the building | be trusted |
+| --- | ------------ | ---------- |
+Critical information lives inside thousands  Mainstream AI assistants ask you to  When an AI produces an answer with no
+of PDFs, scans, and Office documents that  upload your documents to their servers.  link to where the information came from,
+| no one can effectively search. Staff spend  | For government, legal, healthcare, and  |     |
+| ------------------------------------------- | --------------------------------------- | --- |
+it cannot be verified. In regulated
+| hours locating a single clause, and  | financial work, that is often non- |     |
+| ------------------------------------ | ---------------------------------- | --- |
+environments, an unverifiable answer is
+| institutional knowledge walks out the door  | negotiable -the data cannot leave your  |     |
+| ------------------------------------------- | --------------------------------------- | --- |
+the same as no answer at all.
+| when experienced employees leave. | jurisdiction or your network. |     |
+| --------------------------------- | ----------------------------- | --- |
+
+THE SEEKRA APPROACH
+Bring the intelligence to your documents — not
+the other way around.
+ASK SEE
+◌ ▣
+Conversational Q&A Search by image
+SPEAK TRUST
+◖ ⛨
+Arabic-first voice Nothing leaves the box
+
+CAPABILITY 01 · ASK
+ai.genoa-design.com
+Answers you can verify in one
+What does our policy say about data retention for
+click customer records?
+SEEKRA
+Customer records must be retained for seven years from the date of
+StafftypeaquestioninplainlanguageandSeekrarespondswithananswerdrawn
+account closure, after which they are securely destroyed [1]. Records
+from the organization’s own documents. Every claim in the response is marked flagged as part of an active investigation are exempt and held until
+legal release [2].
+with a numbered citation that links to the exact source document and page,
+openinginstantlyinthebuilt-inviewer. [1] Customer Data Policy v3 · p.14 [2] Legal Hold Procedure · p.3
+✓ Natural-language questions —no query syntax to learn
+✓ Numbered citations link to the exact source page
+✓ Built-in viewer opens PDF, Word, Excel, and PowerPoint in the browser
+✓ Critical for compliance-driven buyers who require verifiable AI
+
+CAPABILITY 02 · SEE
+ai.genoa-design.com
+Search your archive with a
+VISUAL SEARCH
+a photograph.
+↑
+Upload a photo or scan
+Upload a photo, scanned image, or screenshot, and Seekra finds visually similar
+items across the entire archive using image similarity. Each result shows a
+SIMILAR RESULTS
+similarity score and a label describing what the image most likely shows, plus the
+▣ ▣ ▣ documents it relates to.
+✓ Field inspections, damage photos, site images —searchable without any text
+92% match 86% match 78% match
+✓ Image-to-image similarity with detected-content labels
+Detected: site inspection · equipment · safety helmets
+✓ A differentiator almost no competitor offers
+✓ Works for scans, photographs, screenshots, and document page images
+
+CAPABILITY 03 · SPEAK
+Speak to your archive. In Arabic or
+English.
+ةيبرعلا ·English
+◖ ⇄
+Speech-to-text in, spoken answers out Arabic as a first-class citizen —proper RTL rendering
+◯ ◯
+English with full parity —not a translated afterthought Built for the Gulf market where this combination is rare
+
+TRUST · SECURITY & SOVEREIGNTY
+.
+Nothing leaves the box
+Three deployment tiers PII masked at the source
+▦ ⊘
+Role-based access control Full audit logging
+⛨ ✓
+
+HOW SEEKRA COMPARES
+An honest comparison.
+Cloud AI assistants are strong for general-purpose work. The comparison below concerns enterprise data handling —where Seekra is
+purpose-built.
+| Capability                                | Seekra | Typical Cloud AI |
+| ----------------------------------------- | ------ | ---------------- |
+| Data residency inside your infrastructure | ✓Yes   | ✗No              |
+|                                           | ✓Yes   | ✗No              |
+Air-gapped / offline option
+| PII masked at source           | ✓Yes | Partial |
+| ------------------------------ | ---- | ------- |
+| Page-level citations to source | ✓Yes | Partial |
+| Visual / image search          | ✓Yes | Partial |
+| Arabic voice (first-class)     | ✓Yes | Partial |
+| Offline operation              | ✓Yes | ✗No     |
+Cloud AI tools are excellent generalists. This comparison concerns enterprise data handling, sovereignty, and verifiable answers—not general-purpose assistant quality.
+
+DEPLOYMENT
+Three tiers. One platform. You choose
+Seekra runs in three deployment tiers -from cloud-native to fully air-gapped -so you choose exactly where
+the AI runs and how isolated your environment is. The platform stays the same; only the AI location and
+network exposure change.
+TIER 03 · MAXIMUM SECURITY
+TIER 01 · FASTEST TIER 02 · SOVEREIGN
+▦
+⚿
+| Cloud Native                                           | Self-Hosted                                       | Air-Gapped |
+| ------------------------------------------------------ | ------------------------------------------------- | ---------- |
+| Seekra runs in your cloud tenant and can leverage      | Seekra runs entirely on your own infrastructure - |            |
+| industry-leading external AI models -ChatGPT,          | cloud VM or on-premises servers -with AI models   |            |
+| Gemini, Claude -with PII automatically masked          | hosted locally. Full data sovereignty. Nothing    |            |
+| before any external call. Best AI capability, fastest  | leaves your network.                              |            |
+to deploy.
+No pricing is published. Deployment tier and scale are discussed in person during the demo.
+
+USE CASES
+Built for the Gulf’s most regulated sectors.
+Seekra is designed for organizations where data sovereignty, Arabic-first interaction, and verifiable answers are not optional. The use cases below reflect the
+cases below reflect the buyers we built it for.
+Government & Public Sector Legal & Compliance ◫ Banking & Financial Services
+Sovereign archives, classified Case-file Q&A with verifiable Policy and contract search across
+document handling, Arabic-first citations. Privileged-document across thousands of documents.
+citizen services, and a complete audit isolation through collections. Personal information redacted
+trail for every action. Retention controls and read-only before AI. Regulator-ready audit
+only auditor oversight. audit logs.
+✚ Healthcare Energy & Utilities
+Patient record Q&A, image-based Field inspection photos searchable
+diagnostic search, and on-prem by image. Arabic-first operations
+deployment for HIPAA-equivalent documentation. Air-gapped option
+data protection rules. for critical infrastructure.
+
+WHY SEEKRA
+Six honest differentiators.
+| 01  | ▦ 02 | ⊘   | 03  | ⌘   |
+| --- | ---- | --- | --- | --- |
+PII masked at the source Cited answers with page-level deep links
+100% self-hosted
+| 04  | ✦ 05 | ⇄   | 06  | ▤   |
+| --- | ---- | --- | --- | --- |
+True multimodal search Arabic / English parity One workspace, no friction
+
+Seekra
+SEE SEEKRA ON YOUR OWN DOCUMENTS
+Tell us about your archive.
+info@genoa-design.com
+Book a Demo →
+
+Seekra
+·
+REFERENCE DEPLOYMENT ARCHITECTURE
+
+APPENDIX · DEPLOYMENT ARCHITECTURE
+
+Seekra
+.
+THANK YOU

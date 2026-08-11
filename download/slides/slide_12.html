@@ -2,128 +2,76 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Seekra — Why Seekra</title>
+  <title>Seekra — Deployment Options</title>
   <link rel="stylesheet" href="global.css">
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <style>
-    .slide-12 .glow-bl {
-      position: absolute;
-      width: 720px; height: 720px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(181,152,118,0.22) 0%, rgba(181,152,118,0) 65%);
-      filter: blur(8px);
-      bottom: -260px;
-      left: -200px;
-      pointer-events: none;
-    }
-    .slide-12 .top-block { max-width: 900px; position: relative; z-index: 1; }
-    .slide-12 .eyebrow { font-size: 13px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: var(--tan); }
-    .slide-12 .headline { font-family: var(--font-heading); font-weight: 700; font-size: 48px; line-height: 1.12; letter-spacing: -0.025em; color: var(--cream); margin-top: 14px; }
-    .slide-12 .lead { font-weight: 400; font-size: 15px; line-height: 1.6; color: rgba(231,230,228,0.72); margin-top: 16px; max-width: 880px; }
-    .slide-12 .grid {
-      margin-top: 28px;
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      grid-template-rows: repeat(2, 150px);
-      gap: 20px;
-      position: relative;
-      z-index: 1;
-    }
-    .slide-12 .diff-card {
-      background: rgba(231,230,228,0.04);
-      border: 1px solid rgba(231,230,228,0.10);
-      border-radius: 12px;
-      padding: 22px;
-      display: flex;
-      flex-direction: column;
-    }
-    .slide-12 .card-head { display: flex; align-items: center; justify-content: space-between; }
-    .slide-12 .numeral { font-family: var(--font-num); font-weight: 600; font-size: 14px; color: var(--tan); font-feature-settings: 'tnum' 1, 'lnum' 1; letter-spacing: -0.02em; }
-    .slide-12 .card-title { font-family: var(--font-heading); font-weight: 600; font-size: 17px; color: var(--cream); margin-top: 8px; letter-spacing: -0.005em; }
-    .slide-12 .card-body { font-weight: 400; font-size: 13px; line-height: 1.55; color: rgba(231,230,228,0.70); margin-top: 6px; }
+    .slide-10 .eyebrow { font-size: 13px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: #1F1A14; }
+    .slide-10 .headline { font-family: var(--font-heading); font-weight: 700; font-size: 44px; line-height: 1.15; letter-spacing: -0.02em; color: var(--ink-strong); margin-top: 14px; }
+    .slide-10 .lead { font-weight: 400; font-size: 16px; line-height: 1.6; color: var(--ink-2); margin-top: 16px; max-width: 880px; }
+    .slide-10 .card-grid { display: grid; grid-template-columns: 360px 360px 360px; gap: 24px; margin-top: 32px; align-items: start; justify-content: center; }
+    .slide-10 .side-card { width: 360px; height: 320px; background: #FFFFFF; border: 1px solid rgba(61,43,29,0.10); border-radius: 14px; padding: 32px; box-shadow: 0 1px 0 rgba(61,43,29,0.04); }
+    .slide-10 .featured-card { width: 360px; height: 340px; background: var(--charcoal); border: 1px solid rgba(181,152,118,0.30); border-radius: 14px; padding: 32px; margin-top: -10px; position: relative; z-index: 2; }
+    .slide-10 .featured-glow { position: absolute; width: 320px; height: 320px; border-radius: 50%; background: radial-gradient(circle, rgba(181,152,118,0.30) 0%, rgba(181,152,118,0) 65%); filter: blur(8px); top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 0; pointer-events: none; }
+    .slide-10 .icon-square { width: 64px; height: 64px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+    .slide-10 .icon-square.side { background: rgba(181,152,118,0.10); }
+    .slide-10 .icon-square.featured { background: rgba(181,152,118,0.18); }
+    .slide-10 .card-title { font-family: var(--font-heading); font-weight: 600; font-size: 22px; margin-top: 18px; letter-spacing: -0.01em; }
+    .slide-10 .card-body { font-weight: 400; font-size: 14px; line-height: 1.6; margin-top: 12px; }
+    .slide-10 .card-label { font-weight: 600; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--tan); }
+    .slide-10 .footnote { position: absolute; left: 64px; right: 64px; bottom: 32px; font-size: 12px; font-style: italic; color: var(--ink-2); }
   </style>
 </head>
 <body>
-  <div class="slide slide-dark slide-12">
-    <div class="glow-bl" data-decor aria-hidden="true"></div>
+  <div class="slide slide-gray slide-10">
+    <div class="eyebrow">DEPLOYMENT</div>
+    <h1 class="headline period-red">Three tiers. One platform. You choose</h1>
+    <p class="lead">Seekra runs in three deployment tiers — from cloud-native to fully air-gapped — so you choose exactly where the AI runs and how isolated your environment is. The platform stays the same; only the AI location and network exposure change.</p>
 
-    <div class="top-block">
-      <div class="eyebrow">WHY SEEKRA</div>
-      <h1 class="headline period-red">Six honest differentiators</h1>
-      <p class="lead">No fabricated customer logos, no inflated statistics. These are the structural advantages Seekra delivers — verifiable on day one of a pilot.</p>
-    </div>
-
-    <div class="grid">
-      <!-- 01 -->
-      <div class="diff-card">
-        <div class="card-head">
-          <span class="numeral">01</span>
-          <span class="material-icons" style="color: var(--tan); font-size: 22px;">dns</span>
+    <div class="card-grid">
+      <!-- Card 1: Cloud Native (Tier 01) -->
+      <div class="side-card">
+        <div class="icon-square side">
+          <span class="material-icons" style="color: var(--tan); font-size: 36px;">cloud</span>
         </div>
-        <div class="card-title">Three deployment tiers</div>
-        <p class="card-body">From cloud-native (external AI with PII masking) to self-hosted and fully air-gapped. You choose where the AI runs.</p>
+        <div class="card-title" style="color: var(--ink-strong);">Cloud Native</div>
+        <p class="card-body" style="color: var(--ink-2);">Seekra runs in your cloud tenant and can leverage industry-leading external AI models — ChatGPT, Gemini, Claude — with PII automatically masked before any external call. Best AI capability, fastest to deploy.</p>
+        <div class="card-label" style="margin-top: 18px;">TIER 01 · FASTEST</div>
       </div>
 
-      <!-- 02 -->
-      <div class="diff-card">
-        <div class="card-head">
-          <span class="numeral">02</span>
-          <span class="material-icons" style="color: var(--tan); font-size: 22px;">visibility_off</span>
+      <!-- Card 2: Self-Hosted (Tier 02) -->
+      <div class="side-card">
+        <div class="icon-square side">
+          <span class="material-icons" style="color: var(--tan); font-size: 36px;">dns</span>
         </div>
-        <div class="card-title">PII masked at the source</div>
-        <p class="card-body">Names, ID numbers, emails, and phone numbers are automatically redacted before any AI call. Critical for cloud-native tier; preserved across all tiers.</p>
+        <div class="card-title" style="color: var(--ink-strong);">Self-Hosted</div>
+        <p class="card-body" style="color: var(--ink-2);">Seekra runs entirely on your own infrastructure — cloud VM or on-premises servers — with AI models hosted locally. Full data sovereignty. Nothing leaves your network.</p>
+        <div class="card-label" style="margin-top: 18px;">TIER 02 · SOVEREIGN</div>
       </div>
 
-      <!-- 03 -->
-      <div class="diff-card">
-        <div class="card-head">
-          <span class="numeral">03</span>
-          <span class="material-icons" style="color: var(--tan); font-size: 22px;">link</span>
+      <!-- Card 3: Air-Gapped (Tier 03, Featured) -->
+      <div class="featured-card">
+        <div class="featured-glow" data-decor aria-hidden="true"></div>
+        <div class="icon-square featured" style="position: relative; z-index: 1;">
+          <span class="material-icons" style="color: var(--tan); font-size: 36px;">shield_lock</span>
         </div>
-        <div class="card-title">Cited answers with page-level deep links</div>
-        <p class="card-body">Every claim in an answer links to its source page in the built-in viewer.</p>
-      </div>
-
-      <!-- 04 -->
-      <div class="diff-card">
-        <div class="card-head">
-          <span class="numeral">04</span>
-          <span class="material-icons" style="color: var(--tan); font-size: 22px;">hub</span>
-        </div>
-        <div class="card-title">True multimodal search</div>
-        <p class="card-body">Text, image, and voice in one system — not three separate products.</p>
-      </div>
-
-      <!-- 05 -->
-      <div class="diff-card">
-        <div class="card-head">
-          <span class="numeral">05</span>
-          <span class="material-icons" style="color: var(--tan); font-size: 22px;">translate</span>
-        </div>
-        <div class="card-title">Arabic / English parity</div>
-        <p class="card-body">First-class Arabic with proper RTL and font shaping. Not a translated afterthought.</p>
-      </div>
-
-      <!-- 06 -->
-      <div class="diff-card">
-        <div class="card-head">
-          <span class="numeral">06</span>
-          <span class="material-icons" style="color: var(--tan); font-size: 22px;">description</span>
-        </div>
-        <div class="card-title">One workspace, no friction</div>
-        <p class="card-body">Built-in viewer for PDF, Word, Excel, PowerPoint. No “download and open locally” round-trip.</p>
+        <div class="card-title" style="color: var(--cream); position: relative; z-index: 1;">Air-Gapped</div>
+        <p class="card-body" style="color: rgba(231,230,228,0.78); position: relative; z-index: 1;">Fully isolated self-hosted deployment with no external network connection. For classified, sovereign, or maximum-security workloads where even update traffic is not permitted.</p>
+        <div class="card-label" style="margin-top: 18px; position: relative; z-index: 1;">TIER 03 · MAXIMUM SECURITY</div>
       </div>
     </div>
+
+    <div class="footnote">No pricing is published. Deployment tier and scale are discussed in person during the demo.</div>
   </div>
 
   <aside data-notes class="hidden">
-    • These six differentiators are all verifiable on day one of a pilot — invite the client to test any of them.
-    • The differentiators compound: three-tier deployment flexibility + PII masking + cited answers is the bundle competitors cannot match.
-    • Multimodal in one platform is rare — most vendors stitch three separate products together.
-    • Arabic / English parity is structural, not a localized afterthought.
-    • In self-hosted and air-gapped deployments the AI model itself runs on the customer's own servers — no external dependency.
-    • Transition: "Let's talk about seeing Seekra on your own documents."
+    • Three deployment tiers, one platform — the same Seekra application, PII masking, and document store across all tiers; only the AI location and network exposure change.
+    • Tier 01 Cloud Native: fastest to deploy, leverages best-in-class external AI models with PII masking as the protection layer. Good for evaluation and for organizations not ready to host AI locally.
+    • Tier 02 Self-Hosted: full data sovereignty, AI runs locally on your infrastructure (cloud VM or on-prem), no AI traffic leaves your network.
+    • Tier 03 Air-Gapped: maximum security for classified/sovereign workloads. No external network at all — updates via physical media or data diode.
+    • Most clients start with Cloud Native for evaluation, then upgrade to Self-Hosted or Air-Gapped for production as their sovereignty requirements mature.
+    • Pricing is always discussed in person during the demo, never published.
   </aside>
 </body>
 </html>

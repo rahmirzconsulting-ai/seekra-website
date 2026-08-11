@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Seekra — Capability 01 · Ask</title>
+  <title>Seekra — The Problem</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link rel="stylesheet" href="global.css">
@@ -15,226 +15,109 @@
       letter-spacing: 0.22em;
       text-transform: uppercase;
     }
-    .ask-headline {
+    .prob-headline {
       font-family: var(--font-heading);
       font-weight: 700;
-      font-size: 46px;
-      line-height: 1.12;
-      letter-spacing: -0.025em;
+      font-size: 44px;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
       color: var(--ink-strong);
-      max-width: 540px;
       margin-top: 14px;
     }
-    .ask-headline .period-red::after {
+    .prob-headline .period-red::after {
       content: '.';
       color: var(--brick);
     }
-    .ask-body {
-      font-family: var(--font-body);
-      font-weight: 400;
-      font-size: 16px;
-      line-height: 1.65;
-      color: var(--ink-2);
-      max-width: 520px;
-      margin-top: 22px;
-    }
-    .benefit-list {
-      margin-top: 22px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-    .benefit-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-    }
-    .benefit-item .material-icons {
-      color: var(--tan);
-      font-size: 18px !important;
-      flex-shrink: 0;
-      margin-top: 1px;
-    }
-    .benefit-text {
-      font-family: var(--font-body);
-      font-weight: 500;
-      font-size: 14px;
-      color: var(--ink-strong);
-      line-height: 1.5;
-    }
-
-    /* Browser frame */
-    .browser-frame {
-      width: 480px;
-      height: 420px;
-      background: #FFFFFF;
-      border: 1px solid rgba(61,43,29,0.18);
-      border-radius: 12px;
-      box-shadow: 0 12px 40px rgba(181,152,118,0.18);
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-    .browser-chrome {
-      height: 36px;
-      background: #F5F4F2;
-      border-bottom: 1px solid rgba(61,43,29,0.08);
-      padding: 0 16px;
-      display: flex;
-      align-items: center;
-      position: relative;
-      flex-shrink: 0;
-    }
-    .browser-dots {
-      display: flex;
-      gap: 6px;
-    }
-    .browser-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-    }
-    .url-pill {
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
+    .prob-card {
+      width: 360px;
+      height: 340px;
       background: #FFFFFF;
       border: 1px solid rgba(61,43,29,0.10);
-      border-radius: 4px;
-      padding: 4px 14px;
-      font-family: var(--font-num);
-      font-weight: 500;
-      font-size: 11px;
-      color: var(--ink-2);
-    }
-    .browser-content {
-      padding: 24px;
-      flex: 1;
+      border-radius: 14px;
+      padding: 32px;
+      box-shadow: 0 1px 0 rgba(61,43,29,0.04);
       display: flex;
       flex-direction: column;
-      justify-content: flex-start;
     }
-    .user-bubble {
-      align-self: flex-end;
-      max-width: 80%;
-      background: var(--charcoal);
-      color: var(--cream);
-      padding: 12px;
-      border-radius: 10px;
-      font-family: var(--font-body);
-      font-weight: 400;
-      font-size: 13px;
-      line-height: 1.45;
-    }
-    .answer-block {
-      margin-top: 16px;
-      max-width: 92%;
-    }
-    .answer-label {
+    .prob-num {
       font-family: var(--font-heading);
       font-weight: 600;
-      font-size: 10px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
+      font-size: 28px;
       color: var(--tan);
+      font-feature-settings: 'tnum' 1, 'lnum' 1;
+      letter-spacing: -0.01em;
     }
-    .answer-text {
+    .prob-card .material-icons {
+      color: var(--tan);
+      font-size: 36px !important;
+      margin-top: 14px;
+    }
+    .prob-card-head {
+      font-family: var(--font-heading);
+      font-weight: 600;
+      font-size: 22px;
+      line-height: 1.25;
+      color: var(--ink-strong);
+      margin-top: 16px;
+    }
+    .prob-card-body {
       font-family: var(--font-body);
       font-weight: 400;
-      font-size: 13px;
-      line-height: 1.55;
-      color: var(--ink);
-      margin-top: 4px;
-    }
-    .citation-row {
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--ink-2);
       margin-top: 12px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-    .citation-chip {
-      background: rgba(181,152,118,0.14);
-      border: 1px solid rgba(181,152,118,0.32);
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-family: var(--font-body);
-      font-weight: 500;
-      font-size: 11px;
-      color: var(--ink-strong);
     }
   </style>
 </head>
 <body>
   <div class="slide slide-light">
-    <div class="flex h-full" style="gap:0;">
-      <!-- LEFT COLUMN: 52% -->
-      <div style="width:52%; padding-right:32px; display:flex; flex-direction:column; justify-content:center;">
-        <div class="eyebrow-tan">Capability 01 · Ask</div>
-        <h1 class="ask-headline period-red">Answers you can verify in one click</h1>
-        <p class="ask-body">
-          Staff type a question in plain language and Seekra responds with an answer drawn from the organization&rsquo;s own documents. Every claim in the response is marked with a numbered citation that links to the exact source document and page, opening instantly in the built-in viewer.
-        </p>
-        <div class="benefit-list">
-          <div class="benefit-item">
-            <span class="material-icons">check_circle</span>
-            <span class="benefit-text">Natural-language questions — no query syntax to learn</span>
-          </div>
-          <div class="benefit-item">
-            <span class="material-icons">check_circle</span>
-            <span class="benefit-text">Numbered citations link to the exact source page</span>
-          </div>
-          <div class="benefit-item">
-            <span class="material-icons">check_circle</span>
-            <span class="benefit-text">Built-in viewer opens PDF, Word, Excel, and PowerPoint in the browser</span>
-          </div>
-          <div class="benefit-item">
-            <span class="material-icons">check_circle</span>
-            <span class="benefit-text">Critical for compliance-driven buyers who require verifiable AI</span>
-          </div>
+    <!-- TOP BLOCK -->
+    <div style="padding-bottom:36px;">
+      <div class="eyebrow-tan">Why Seekra Exists</div>
+      <h1 class="prob-headline period-red">Three problems every large archive suffers from</h1>
+    </div>
+
+    <!-- THREE-CARD GRID -->
+    <div class="flex" style="gap:24px;">
+      <!-- CARD 01 -->
+      <div class="prob-card">
+        <div class="prob-num num">01</div>
+        <span class="material-icons">folder_off</span>
+        <div class="prob-card-head">Knowledge buried in files</div>
+        <div class="prob-card-body">
+          Critical information lives inside thousands of PDFs, scans, and Office documents that no one can effectively search. Staff spend hours locating a single clause, and institutional knowledge walks out the door when experienced employees leave.
         </div>
       </div>
 
-      <!-- RIGHT COLUMN: 48% -->
-      <div style="width:48%; display:flex; align-items:center; justify-content:center;">
-        <div class="browser-frame">
-          <!-- Chrome bar -->
-          <div class="browser-chrome">
-            <div class="browser-dots">
-              <span class="browser-dot" style="background:#B93C32;"></span>
-              <span class="browser-dot" style="background:#B59876;"></span>
-              <span class="browser-dot" style="background:#202020;"></span>
-            </div>
-            <div class="url-pill">app.seekra.pk</div>
-          </div>
+      <!-- CARD 02 -->
+      <div class="prob-card">
+        <div class="prob-num num">02</div>
+        <span class="material-icons">cloud_off</span>
+        <div class="prob-card-head">Cloud AI means data leaves the building</div>
+        <div class="prob-card-body">
+          Mainstream AI assistants ask you to upload your documents to their servers. For government, legal, healthcare, and financial work, that is often non-negotiable — the data cannot leave your jurisdiction or your network.
+        </div>
+      </div>
 
-          <!-- Content -->
-          <div class="browser-content">
-            <div class="user-bubble">
-              What does our policy say about data retention for customer records?
-            </div>
-
-            <div class="answer-block">
-              <div class="answer-label">Seekra</div>
-              <div class="answer-text">
-                Customer records must be retained for seven years from the date of account closure, after which they are securely destroyed [1]. Records flagged as part of an active investigation are exempt and held until legal release [2].
-              </div>
-              <div class="citation-row">
-                <span class="citation-chip">[1] Customer Data Policy v3 · p.14</span>
-                <span class="citation-chip">[2] Legal Hold Procedure · p.3</span>
-              </div>
-            </div>
-          </div>
+      <!-- CARD 03 -->
+      <div class="prob-card">
+        <div class="prob-num num">03</div>
+        <span class="material-icons">help_outline</span>
+        <div class="prob-card-head">Answers without sources can&rsquo;t be trusted</div>
+        <div class="prob-card-body">
+          When an AI produces an answer with no link to where the information came from, it cannot be verified. In regulated environments, an unverifiable answer is the same as no answer at all.
         </div>
       </div>
     </div>
   </div>
 
   <aside data-notes class="hidden">
-    • Emphasize "verify in one click" as the key buying argument — every claim links to its source.
-    • Walk the audience through the citation chip → source page flow conceptually, pointing at the mockup.
-    • Mention that PDF, Word, Excel, and PowerPoint all open in the built-in viewer — no Office install required.
-    • Tie to compliance: regulators want audit trails of how a decision was reached, not just the decision itself.
-    • Transition: "Ask handles text. Next, let's look at See — searching the archive with a photograph."
+    • Anchor on the three pain points: buried knowledge, cloud AI data exfiltration, and unverifiable answers.
+    • Emphasize these are universal across regulated sectors — government, legal, healthcare, financial services all face the same trio.
+    • Pause on card 02: for many clients "data leaving the building" is a hard no, not a preference.
+    • Reinforce card 03: regulators don't accept "the AI said so" — they require a source.
+    • Transition: "Seekra was built to solve all three at once" — sets up the next slide on the Seekra approach.
   </aside>
 </body>
 </html>
