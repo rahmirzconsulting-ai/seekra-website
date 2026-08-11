@@ -1,15 +1,27 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "rewrites": [
+  "redirects": [
     {
-      "source": "/(.*)",
+      "source": "/",
       "has": [
         {
           "type": "host",
           "value": "app.seekra.pk"
         }
       ],
-      "destination": "/app"
+      "destination": "https://seekra.pk/app/",
+      "permanent": false
+    },
+    {
+      "source": "/app",
+      "has": [
+        {
+          "type": "host",
+          "value": "app.seekra.pk"
+        }
+      ],
+      "destination": "https://seekra.pk/app/",
+      "permanent": false
     }
   ]
 }
