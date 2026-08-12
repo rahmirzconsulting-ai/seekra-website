@@ -1,0 +1,831 @@
+     1→"use client";
+     2→
+     3→import { ChangeEvent, DragEvent, FormEvent, useCallback, useEffect, useRef, useState } from "react";
+     4→import { useRouter } from "next/navigation";
+     5→import {
+     6→  Clock,
+     7→  Eye,
+     8→  FileText,
+     9→  Image as ImageIcon,
+    10→  Loader2,
+    11→  Search as SearchIcon,
+    12→  Bookmark,
+    13→  Check,
+    14→  Sparkles,
+    15→  SlidersHorizontal,
+    16→  X,
+    17→} from "lucide-react";
+    18→import { AppLayout } from "@/components/app-layout";
+    19→import { PiiBadge } from "@/components/pii-badge";
+    20→import { VisualBadge } from "@/components/visual-badge";
+    21→import { useI18n } from "@/i18n/i18n-context";
+    22→import {
+    23→  getFileUrl,
+    24→  getFiles,
+    25→  getVisualThumbnailUrl,
+    26→  smartSearch,
+    27→  smartSearchByImage,
+    28→  createSavedSearch,
+    29→  type SmartSearchResponse,
+    30→  type SmartSearchResult,
+    31→} from "@/lib/api";
+    32→import { localizedVisualLabel } from "@/lib/visual-labels";
+    33→
+    34→const SEARCH_STATE_KEY = "seekra_search_state";
+    35→const SEARCH_STATE_VERSION = 6;
+    36→const thumbnailPromiseCache = new Map<number, Promise<string>>();
+    37→
+    38→function loadVisualThumbnail(assetId: number): Promise<string> {
+    39→  if (!thumbnailPromiseCache.has(assetId)) {
+    40→    thumbnailPromiseCache.set(assetId, getVisualThumbnailUrl(assetId));
+    41→  }
+    42→  return thumbnailPromiseCache.get(assetId)!;
+    43→}
+    44→
+    45→type SourceFilter = "all" | "documents" | "images" | "pdf_pages" | "videos" | "audio";
+    46→type TranslateWithFallback = (key: string, fallback: string) => string;
+    47→
+    48→function formatTime(seconds: number): string {
+    49→  const total = Math.floor(seconds);
+    50→  const minutes = Math.floor(total / 60);
+    51→  return `${minutes}:${String(total % 60).padStart(2, "0")}`;
+    52→}
+    53→
+    54→function HighlightedText({ text, query }: { text: string; query: string }) {
+    55→  if (!text || !query) return <span>{text}</span>;
+    56→  const terms = query.trim().split(/\s+/).filter((term) => term.length > 1);
+    57→  if (!terms.length) return <span>{text}</span>;
+    58→  let parts: (string | JSX.Element)[] = [text];
+    59→  terms.forEach((term, termIndex) => {
+    60→    const next: (string | JSX.Element)[] = [];
+    61→    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    62→    const regex = new RegExp(`(${escaped})`, "gi");
+    63→    parts.forEach((part) => {
+    64→      if (typeof part !== "string") {
+    65→        next.push(part);
+    66→        return;
+    67→      }
+    68→      part.split(regex).forEach((piece, pieceIndex) => {
+    69→        if (pieceIndex % 2 === 1) {
+    70→          next.push(
+    71→            <mark key={`${termIndex}-${pieceIndex}-${piece}`} className="bg-primary/25 text-foreground rounded px-0.5">
+    72→              {piece}
+    73→            </mark>
+    74→          );
+    75→        } else if (piece) {
+    76→          next.push(piece);
+    77→        }
+    78→      });
+    79→    });
+    80→    parts = next;
+    81→  });
+    82→  return <>{parts}</>;
+    83→}
+    84→
+    85→function SmartThumbnail({ assetId, alt }: { assetId: number; alt: string }) {
+    86→  const [url, setUrl] = useState<string | null>(null);
+    87→  const [failed, setFailed] = useState(false);
+    88→
+    89→  useEffect(() => {
+    90→    let active = true;
+    91→    setUrl(null);
+    92→    setFailed(false);
+    93→    loadVisualThumbnail(assetId)
+    94→      .then((nextUrl) => {
+    95→        if (active) setUrl(nextUrl);
+    96→      })
+    97→      .catch(() => active && setFailed(true));
+    98→    return () => {
+    99→      active = false;
+   100→    };
+   101→  }, [assetId]);
+   102→
+   103→  if (failed || !url) {
+   104→    return (
+   105→      <div className="w-full sm:w-40 h-28 rounded-lg bg-surface border border-border flex items-center justify-center text-muted-foreground shrink-0">
+   106→        {failed ? <FileText className="w-6 h-6" /> : <Loader2 className="w-5 h-5 animate-spin" />}
+   107→      </div>
+   108→    );
+   109→  }
+   110→  return (
+   111→    <img
+   112→      src={url}
+   113→      alt={alt}
+   114→      loading="lazy"
+   115→      className="w-full sm:w-40 h-28 rounded-lg object-cover bg-surface border border-border shrink-0"
+   116→    />
+   117→  );
+   118→}
+   119→
+   120→function resultSource(result: SmartSearchResult): Exclude<SourceFilter, "all"> {
+   121→  if (result.result_type === "visual_asset") {
+   122→    if (result.asset_type === "pdf_page") return "pdf_pages";
+   123→    if (result.asset_type === "video_frame") return "videos";
+   124→    return "images";
+   125→  }
+   126→  // 22B: classify by the real file type, not "everything is a document" -
+   127→  // an MP3 transcript hit is audio, a video transcript hit is a video.
+   128→  const ct = (result.content_type || "").toLowerCase();
+   129→  if (ct === "audio" || ct.startsWith("audio/")) return "audio";
+   130→  if (ct === "video" || ct.startsWith("video/")) return "videos";
+   131→  if (ct === "image" || ct.startsWith("image/")) return "images";
+   132→  return "documents";
+   133→}
+   134→
+   135→function sourceLabel(result: SmartSearchResult, tf: TranslateWithFallback): string {
+   136→  if (result.result_type === "visual_asset") {
+   137→    if (result.asset_type === "pdf_page") {
+   138→      return `${tf("search.sourcePdfPage", "PDF page")} ${result.page_number || ""}`.trim();
+   139→    }
+   140→    if (result.asset_type === "video_frame") {
+   141→      return `${tf("search.sourceVideo", "Video")} ${formatTime(result.start_time || 0)}`;
+   142→    }
+   143→    return tf("search.sourceImage", "Image");
+   144→  }
+   145→  const contentType = (result.content_type || "").toLowerCase();
+   146→  if (contentType.includes("video")) return tf("search.sourceVideo", "Video");
+   147→  if (contentType.includes("audio")) return tf("search.sourceAudio", "Audio");
+   148→  if (contentType.includes("pdf")) return tf("search.sourcePdf", "PDF");
+   149→  if (contentType.startsWith("image/")) return tf("search.sourceImage", "Image");
+   150→  return tf("search.sourceDocument", "Document");
+   151→}
+   152→
+   153→function localizedMatchReason(reason: string, tf: TranslateWithFallback): string {
+   154→  const reasonKeys: Record<string, [string, string]> = {
+   155→    "Filename match": ["search.reasonFilename", "Filename match"],
+   156→    "Text match": ["search.reasonText", "Text match"],
+   157→    "Transcript match": ["search.reasonTranscript", "Transcript match"],
+   158→    "Semantic match": ["search.reasonSemantic", "Semantic match"],
+   159→    "Semantic audio match": ["search.reasonSemanticAudio", "Semantic audio match"],
+   160→    "Text inside image": ["search.reasonVisualText", "Text inside image"],
+   161→    "Object match": ["search.reasonObject", "Object match"],
+   162→    "Visual match": ["search.reasonVisual", "Visual match"],
+   163→  };
+   164→  const [key, fallback] = reasonKeys[reason] || ["", reason];
+   165→  return key ? tf(key, fallback) : reason;
+   166→}
+   167→
+   168→function MatchReasons({ result, tf }: { result: SmartSearchResult; tf: TranslateWithFallback }) {
+   169→  return (
+   170→    <>
+   171→      {result.match_reasons.slice(0, 3).map((reason) => (
+   172→        <span
+   173→          key={reason}
+   174→          className="px-2 py-1 rounded-md text-[11px] bg-primary/10 text-primary border border-primary/20"
+   175→        >
+   176→          {localizedMatchReason(reason, tf)}
+   177→        </span>
+   178→      ))}
+   179→    </>
+   180→  );
+   181→}
+   182→
+   183→const CATEGORY_BUCKETS = [
+   184→  "pdf",
+   185→  "documents",
+   186→  "spreadsheets",
+   187→  "presentations",
+   188→  "images",
+   189→  "video",
+   190→  "audio",
+   191→] as const;
+   192→
+   193→type FacetState = {
+   194→  categories: Record<string, number>;
+   195→  languages: Record<string, number>;
+   196→};
+   197→
+   198→const EMPTY_FACETS: FacetState = { categories: {}, languages: {} };
+   199→
+   200→export default function SearchPage() {
+   201→  const router = useRouter();
+   202→  const { t } = useI18n();
+   203→  const tf = useCallback(
+   204→    (key: string, fallback: string) => (t(key) !== key ? t(key) : fallback),
+   205→    [t]
+   206→  );
+   207→
+   208→  const [query, setQuery] = useState("");
+   209→  const [results, setResults] = useState<SmartSearchResult[]>([]);
+   210→  const [legs, setLegs] = useState<Record<string, number>>({});
+   211→  const [timingMs, setTimingMs] = useState<Record<string, number>>({});
+   212→  const [partial, setPartial] = useState(false);
+   213→  const [hasSearched, setHasSearched] = useState(false);
+   214→  const [isSearching, setIsSearching] = useState(false);
+   215→  const [isImageSearching, setIsImageSearching] = useState(false);
+   216→  const [imageDragOver, setImageDragOver] = useState(false);
+   217→  const [error, setError] = useState<string | null>(null);
+   218→  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+   219→  const [filtersOpen, setFiltersOpen] = useState(false);
+   220→  const [categories, setCategories] = useState<string[]>([]);
+   221→  const [language, setLanguage] = useState("");
+   222→  const [dateFrom, setDateFrom] = useState("");
+   223→  const [dateTo, setDateTo] = useState("");
+   224→  const [piiOnly, setPiiOnly] = useState(false);
+   225→  const [visualsOnly, setVisualsOnly] = useState(false);
+   226→  const [facets, setFacets] = useState<FacetState>(EMPTY_FACETS);
+   227→  const imageInputRef = useRef<HTMLInputElement | null>(null);
+   228→
+   229→  const activeFilterCount =
+   230→    categories.length +
+   231→    (language ? 1 : 0) +
+   232→    (dateFrom ? 1 : 0) +
+   233→    (dateTo ? 1 : 0) +
+   234→    (piiOnly ? 1 : 0) +
+   235→    (visualsOnly ? 1 : 0);
+   236→
+   237→  const clearFilters = useCallback(() => {
+   238→    setCategories([]);
+   239→    setLanguage("");
+   240→    setDateFrom("");
+   241→    setDateTo("");
+   242→    setPiiOnly(false);
+   243→    setVisualsOnly(false);
+   244→  }, []);
+   245→
+   246→  const toggleCategory = useCallback((bucket: string) => {
+   247→    setCategories((prev) =>
+   248→      prev.includes(bucket) ? prev.filter((item) => item !== bucket) : [...prev, bucket]
+   249→    );
+   250→  }, []);
+   251→
+   252→  useEffect(() => {
+   253→    try {
+   254→      const saved = sessionStorage.getItem(SEARCH_STATE_KEY);
+   255→      if (!saved) return;
+   256→      const parsed = JSON.parse(saved);
+   257→      if (parsed?.version !== SEARCH_STATE_VERSION) return;
+   258→      setQuery(parsed.query || "");
+   259→      setResults(Array.isArray(parsed.results) ? parsed.results : []);
+   260→      setLegs(parsed.legs || {});
+   261→      setTimingMs(parsed.timingMs || {});
+   262→      setPartial(Boolean(parsed.partial));
+   263→      setHasSearched(Boolean(parsed.hasSearched));
+   264→    } catch {
+   265→      // Ignore malformed saved search state.
+   266→    }
+   267→  }, []);
+   268→
+   269→  useEffect(() => {
+   270→    if (!hasSearched) return;
+   271→    try {
+   272→      sessionStorage.setItem(
+   273→        SEARCH_STATE_KEY,
+   274→        JSON.stringify({
+   275→          version: SEARCH_STATE_VERSION,
+   276→          query,
+   277→          results,
+   278→          legs,
+   279→          timingMs,
+   280→          partial,
+   281→          hasSearched,
+   282→        })
+   283→      );
+   284→    } catch {
+   285→      // Storage quota is not critical.
+   286→    }
+   287→  }, [hasSearched, legs, partial, query, results, timingMs]);
+   288→
+   289→  const prefetchUrls = useCallback((rows: SmartSearchResult[]) => {
+   290→    const documentIds = Array.from(new Set(rows.map((row) => row.document_id)));
+   291→    if (!documentIds.length) return;
+   292→    getFiles()
+   293→      .then((files) => {
+   294→        files
+   295→          .filter((doc) => documentIds.includes(doc.id))
+   296→          .forEach((doc) => getFileUrl(doc.id).catch(() => undefined));
+   297→      })
+   298→      .catch(() => undefined);
+   299→  }, []);
+   300→
+   301→  const applyResponse = useCallback(
+   302→    (response: SmartSearchResponse) => {
+   303→      setResults(response.results || []);
+   304→      setLegs(response.legs || {});
+   305→      setTimingMs(response.timing_ms || {});
+   306→      setPartial(Boolean(response.partial));
+   307→      setHasSearched(true);
+   308→      setSourceFilter("all");
+   309→      setFacets(response.facets || EMPTY_FACETS);
+   310→      prefetchUrls(response.results || []);
+   311→    },
+   312→    [prefetchUrls]
+   313→  );
+   314→
+   315→  const runQuery = useCallback(
+   316→    async (value: string) => {
+   317→      const normalized = value.trim();
+   318→      if (!normalized) return;
+   319→      setIsSearching(true);
+   320→      setError(null);
+   321→      try {
+   322→        const response = await smartSearch({
+   323→          query: normalized,
+   324→          limit: 20,
+   325→          categories: categories.length ? categories : undefined,
+   326→          language: language || undefined,
+   327→          date_from: dateFrom || undefined,
+   328→          date_to: dateTo || undefined,
+   329→          has_pii: piiOnly || undefined,
+   330→          has_visuals: visualsOnly || undefined,
+   331→        });
+   332→        applyResponse(response);
+   333→      } catch (err: any) {
+   334→        setResults([]);
+   335→        setHasSearched(true);
+   336→        setError(err?.message || tf("search.searchFailed", "Search failed"));
+   337→      } finally {
+   338→        setIsSearching(false);
+   339→      }
+   340→    },
+   341→    [applyResponse, tf, categories, language, dateFrom, dateTo, piiOnly, visualsOnly]
+   342→  );
+   343→
+   344→  // Re-run the current query whenever filters change (after the first search).
+   345→  const filtersMounted = useRef(false);
+   346→  useEffect(() => {
+   347→    if (!filtersMounted.current) {
+   348→      filtersMounted.current = true;
+   349→      return;
+   350→    }
+   351→    if (hasSearched && query.trim()) {
+   352→      runQuery(query);
+   353→    }
+   354→    // eslint-disable-next-line react-hooks/exhaustive-deps
+   355→  }, [categories, language, dateFrom, dateTo, piiOnly, visualsOnly]);
+   356→
+   357→  const [savingSearch, setSavingSearch] = useState(false);
+   358→  const [savedTick, setSavedTick] = useState(false);
+   359→  const handleSaveSearch = async () => {
+   360→    if (!query.trim()) return;
+   361→    setSavingSearch(true);
+   362→    try {
+   363→      await createSavedSearch(query.trim().slice(0, 80), query.trim(), false);
+   364→      setSavedTick(true);
+   365→      setTimeout(() => setSavedTick(false), 2500);
+   366→    } catch {
+   367→      setError(tf("saved.createFailed", "Failed to save the search."));
+   368→    } finally {
+   369→      setSavingSearch(false);
+   370→    }
+   371→  };
+   372→
+   373→  useEffect(() => {
+   374→    const initial = new URLSearchParams(window.location.search).get("q");
+   375→    if (initial) {
+   376→      setQuery(initial);
+   377→      runQuery(initial);
+   378→    }
+   379→    // eslint-disable-next-line react-hooks/exhaustive-deps
+   380→  }, []);
+   381→
+   382→  const handleSearch = async (event: FormEvent) => {
+   383→    event.preventDefault();
+   384→    await runQuery(query);
+   385→  };
+   386→
+   387→  const runImageSearch = async (file: File | undefined | null) => {
+   388→    if (!file) return;
+   389→    setIsImageSearching(true);
+   390→    setError(null);
+   391→    try {
+   392→      const response = await smartSearchByImage(file, 20);
+   393→      setQuery(file.name);
+   394→      applyResponse(response);
+   395→    } catch (err: any) {
+   396→      setResults([]);
+   397→      setHasSearched(true);
+   398→      setError(err?.message || tf("search.imageSearchFailed", "Image search failed"));
+   399→    } finally {
+   400→      setIsImageSearching(false);
+   401→    }
+   402→  };
+   403→
+   404→  const handleImageSearch = async (event: ChangeEvent<HTMLInputElement>) => {
+   405→    const file = event.target.files?.[0];
+   406→    event.target.value = "";
+   407→    await runImageSearch(file);
+   408→  };
+   409→
+   410→  const handleImageDrop = async (event: DragEvent<HTMLDivElement>) => {
+   411→    event.preventDefault();
+   412→    setImageDragOver(false);
+   413→    const file = event.dataTransfer?.files?.[0];
+   414→    if (file && file.type.startsWith("image/")) {
+   415→      await runImageSearch(file);
+   416→    }
+   417→  };
+   418→
+   419→  const openDocument = useCallback(
+   420→    (docId: number, page?: number, time?: number, newTab = false) => {
+   421→      const params = new URLSearchParams({ doc: String(docId) });
+   422→      if (page) params.set("page", String(page));
+   423→      if (time != null) params.set("t", String(time));
+   424→      if (query.trim()) params.set("q", query.trim());
+   425→      const target = `/viewer/?${params.toString()}`;
+   426→      if (newTab) window.open(target, "_blank");
+   427→      else router.push(target);
+   428→    },
+   429→    [query, router]
+   430→  );
+   431→
+   432→  const openResultDocument = (result: SmartSearchResult, page?: number, time?: number, newTab = false) => {
+   433→    openDocument(result.document_id, page, time, newTab);
+   434→  };
+   435→
+   436→  const openResult = (result: SmartSearchResult, newTab = false) => {
+   437→    const firstPage = result.page_number ?? result.chunks?.find((chunk) => chunk.page_number != null)?.page_number ?? undefined;
+   438→    const firstTime = result.start_time ?? result.segments?.[0]?.start_time ?? undefined;
+   439→    openResultDocument(result, firstPage, firstTime, newTab);
+   440→  };
+   441→
+   442→  const filteredResults = results.filter((result) => {
+   443→    if (sourceFilter === "all") return true;
+   444→    return resultSource(result) === sourceFilter;
+   445→  });
+   446→
+   447→  const sourceCounts = results.reduce(
+   448→    (acc, result) => {
+   449→      acc[resultSource(result)] += 1;
+   450→      return acc;
+   451→    },
+   452→    { documents: 0, images: 0, pdf_pages: 0, videos: 0, audio: 0 } as Record<Exclude<SourceFilter, "all">, number>
+   453→  );
+   454→
+   455→
+   456→  return (
+   457→    <AppLayout>
+   458→      <div className="container mx-auto px-4 py-6">
+   459→        <div className="max-w-5xl mx-auto space-y-5">
+   460→          <div className="text-center">
+   461→            <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center justify-center gap-2">
+   462→              <Sparkles className="w-7 h-7 text-primary" />
+   463→              {tf("search.smartTitle", "Smart Search")}
+   464→            </h1>
+   465→            <p className="text-muted-foreground">
+   466→              {tf("search.smartSubtitle", "One prompt for documents, images, PDF pages, and video moments.")}
+   467→            </p>
+   468→          </div>
+   469→
+   470→          <div className="glass-card rounded-2xl p-4 space-y-3">
+   471→            <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
+   472→              <div className="relative flex-1">
+   473→                <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+   474→                <input
+   475→                  type="text"
+   476→                  value={query}
+   477→                  onChange={(event) => setQuery(event.target.value)}
+   478→                  placeholder={tf(
+   479→                    "search.smartPlaceholder",
+   480→                    "Search documents, images, PDF pages, and video moments…"
+   481→                  )}
+   482→                  className="w-full pl-12 pr-4 py-3.5 bg-surface border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+   483→                />
+   484→              </div>
+   485→
+   486→              <button
+   487→                type="button"
+   488→                onClick={handleSaveSearch}
+   489→                disabled={!query.trim() || savingSearch}
+   490→                className="px-4 py-3.5 bg-surface border border-border hover:border-primary/40 hover:text-primary rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+   491→                title={tf("saved.saveSearch", "Save this search")}
+   492→              >
+   493→                {savingSearch ? <Loader2 className="w-5 h-5 animate-spin" /> : savedTick ? <Check className="w-5 h-5 text-primary" /> : <Bookmark className="w-5 h-5" />}
+   494→                <span className="hidden sm:inline">{savedTick ? tf("saved.savedOk", "Saved!") : tf("saved.saveSearch", "Save")}</span>
+   495→              </button>
+   496→
+   497→              <button
+   498→                type="submit"
+   499→                disabled={isSearching || !query.trim()}
+   500→                className="px-6 py-3.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+   501→              >
+   502→                {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : t("nav.search")}
+   503→              </button>
+   504→            </form>
+   505→
+   506→            <p className="mt-2 px-1 text-xs text-muted-foreground">
+   507→              {tf("search.quoteHint", "") !== "" ? (
+   508→                tf("search.quoteHint", "")
+   509→              ) : (
+   510→                <>
+   511→                  Tip: use <span className="text-primary font-medium">&quot;double quotes&quot;</span> for an
+   512→                  exact phrase &mdash; e.g. <span className="text-primary font-medium">&quot;emergency exits&quot;</span>
+   513→                </>
+   514→              )}
+   515→            </p>
+   516→
+   517→            <input
+   518→              ref={imageInputRef}
+   519→              type="file"
+   520→              accept="image/*"
+   521→              className="hidden"
+   522→              onChange={handleImageSearch}
+   523→            />
+   524→            <div
+   525→              role="button"
+   526→              tabIndex={0}
+   527→              onClick={() => imageInputRef.current?.click()}
+   528→              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); imageInputRef.current?.click(); } }}
+   529→              onDragOver={(e) => { e.preventDefault(); setImageDragOver(true); }}
+   530→              onDragLeave={() => setImageDragOver(false)}
+   531→              onDrop={handleImageDrop}
+   532→              className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-dashed transition-all cursor-pointer ${
+   533→                imageDragOver
+   534→                  ? "border-primary bg-primary/10"
+   535→                  : "border-border/70 bg-surface/50 hover:border-primary/50 hover:bg-primary/5"
+   536→              } ${isImageSearching ? "opacity-60 pointer-events-none" : ""}`}
+   537→            >
+   538→              <div className="p-2 rounded-lg bg-primary/10 text-primary flex-shrink-0">
+   539→                {isImageSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImageIcon className="w-5 h-5" />}
+   540→              </div>
+   541→              <div className="flex-1 min-w-0">
+   542→                <p className="text-sm font-medium text-foreground">
+   543→                  {tf("search.byImageTitle", "Search by image")}
+   544→                </p>
+   545→                <p className="text-xs text-muted-foreground">
+   546→                  {imageDragOver
+   547→                    ? tf("search.byImageDropActive", "Release to find visually similar content")
+   548→                    : tf("search.byImageHint", "Drop an image here, or click to browse — Seekra finds photos, scanned pages and video frames that look like it.")}
+   549→                </p>
+   550→              </div>
+   551→            </div>
+   552→
+   553→            <div>
+   554→              <button
+   555→                type="button"
+   556→                onClick={() => setFiltersOpen((open) => !open)}
+   557→                className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm transition-colors ${
+   558→                  filtersOpen || activeFilterCount > 0
+   559→                    ? "bg-primary/10 text-primary border-primary/30"
+   560→                    : "bg-surface text-muted-foreground border-border hover:border-primary/30 hover:text-primary"
+   561→                }`}
+   562→              >
+   563→                <SlidersHorizontal className="w-4 h-4" />
+   564→                {tf("filters.title", "Filters")}
+   565→                {activeFilterCount > 0 && (
+   566→                  <span className="px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold">
+   567→                    {activeFilterCount}
+   568→                  </span>
+   569→                )}
+   570→              </button>
+   571→
+   572→              {filtersOpen && (
+   573→                <div className="mt-3 p-4 rounded-xl bg-surface/60 border border-border space-y-4">
+   574→                  <div>
+   575→                    <p className="text-xs font-semibold text-muted-foreground mb-2">
+   576→                      {tf("filters.type", "File type")}
+   577→                    </p>
+   578→                    <div className="flex flex-wrap gap-2">
+   579→                      {CATEGORY_BUCKETS.map((bucket) => {
+   580→                        const active = categories.includes(bucket);
+   581→                        const count = facets.categories[bucket];
+   582→                        return (
+   583→                          <button
+   584→                            key={bucket}
+   585→                            type="button"
+   586→                            onClick={() => toggleCategory(bucket)}
+   587→                            className={`px-3 py-1.5 rounded-full border text-sm transition-colors ${
+   588→                              active
+   589→                                ? "bg-primary text-primary-foreground border-primary"
+   590→                                : "bg-surface text-foreground border-border hover:border-primary/40"
+   591→                            }`}
+   592→                          >
+   593→                            {tf(`filters.categories.${bucket}`, bucket)}
+   594→                            {typeof count === "number" && (
+   595→                              <span className={active ? " opacity-80" : " text-muted-foreground"}>
+   596→                                {" "}({count})
+   597→                              </span>
+   598→                            )}
+   599→                          </button>
+   600→                        );
+   601→                      })}
+   602→                    </div>
+   603→                  </div>
+   604→
+   605→                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+   606→                    <div>
+   607→                      <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+   608→                        {tf("filters.language", "Language")}
+   609→                      </label>
+   610→                      <select
+   611→                        value={language}
+   612→                        onChange={(event) => setLanguage(event.target.value)}
+   613→                        className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+   614→                      >
+   615→                        <option value="">{tf("filters.anyLanguage", "Any language")}</option>
+   616→                        <option value="en">{tf("lang.en", "English")}</option>
+   617→                        <option value="ar">{tf("lang.ar", "Arabic")}</option>
+   618→                      </select>
+   619→                    </div>
+   620→                    <div>
+   621→                      <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+   622→                        {tf("filters.dateFrom", "From date")}
+   623→                      </label>
+   624→                      <input
+   625→                        type="date"
+   626→                        value={dateFrom}
+   627→                        onChange={(event) => setDateFrom(event.target.value)}
+   628→                        className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+   629→                      />
+   630→                    </div>
+   631→                    <div>
+   632→                      <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+   633→                        {tf("filters.dateTo", "To date")}
+   634→                      </label>
+   635→                      <input
+   636→                        type="date"
+   637→                        value={dateTo}
+   638→                        onChange={(event) => setDateTo(event.target.value)}
+   639→                        className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+   640→                      />
+   641→                    </div>
+   642→                  </div>
+   643→
+   644→                  <div className="flex flex-wrap items-center gap-4">
+   645→                    <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+   646→                      <input
+   647→                        type="checkbox"
+   648→                        checked={piiOnly}
+   649→                        onChange={(event) => setPiiOnly(event.target.checked)}
+   650→                        className="w-4 h-4 accent-primary"
+   651→                      />
+   652→                      {tf("filters.piiOnly", "PII-flagged only")}
+   653→                    </label>
+   654→                    <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+   655→                      <input
+   656→                        type="checkbox"
+   657→                        checked={visualsOnly}
+   658→                        onChange={(event) => setVisualsOnly(event.target.checked)}
+   659→                        className="w-4 h-4 accent-primary"
+   660→                      />
+   661→                      {tf("filters.visualsOnly", "With visual content only")}
+   662→                    </label>
+   663→                    {activeFilterCount > 0 && (
+   664→                      <button
+   665→                        type="button"
+   666→                        onClick={clearFilters}
+   667→                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors ms-auto"
+   668→                      >
+   669→                        <X className="w-4 h-4" />
+   670→                        {tf("filters.clear", "Clear filters")}
+   671→                      </button>
+   672→                    )}
+   673→                  </div>
+   674→                </div>
+   675→              )}
+   676→            </div>
+   677→
+   678→          </div>
+   679→
+   680→          {error && (
+   681→            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-sm">
+   682→              {error}
+   683→            </div>
+   684→          )}
+   685→
+   686→          {partial && (
+   687→            <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 text-primary text-sm">
+   688→              {tf(
+   689→                "search.partialNotice",
+   690→                "Fast results are shown first. Some semantic matches may still be warming up — retry for a deeper result set."
+   691→              )}
+   692→            </div>
+   693→          )}
+   694→
+   695→          {hasSearched && !isSearching && !isImageSearching && (
+   696→            <div className="space-y-4">
+   697→              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+   698→                <p className="text-sm text-muted-foreground">
+   699→                  {filteredResults.length} {tf("search.results", "result(s)")}
+   700→                  {timingMs.total ? ` · ${timingMs.total} ms` : ""}
+   701→                </p>
+   702→                <div className="flex gap-2 flex-wrap">
+   703→                  {([
+   704→                    ["all", results.length],
+   705→                    ["documents", sourceCounts.documents],
+   706→                    ["images", sourceCounts.images],
+   707→                    ["pdf_pages", sourceCounts.pdf_pages],
+   708→                    ["videos", sourceCounts.videos],
+   709→                    ["audio", sourceCounts.audio],
+   710→                  ] as [SourceFilter, number][]).map(([filter, count]) => (
+   711→                    <button
+   712→                      key={filter}
+   713→                      type="button"
+   714→                      onClick={() => setSourceFilter(filter)}
+   715→                      className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
+   716→                        sourceFilter === filter
+   717→                          ? "bg-primary text-primary-foreground border-primary"
+   718→                          : "bg-surface text-muted-foreground border-border hover:text-foreground"
+   719→                      }`}
+   720→                    >
+   721→                      {filter === "all"
+   722→                        ? tf("search.filterAll", "All")
+   723→                        : tf(`search.filter.${filter}`, filter.replace("_", " "))}
+   724→                      <span className="ml-1 opacity-70">{count}</span>
+   725→                    </button>
+   726→                  ))}
+   727→                </div>
+   728→              </div>
+   729→
+   730→              {filteredResults.length === 0 ? (
+   731→                <div className="glass-card rounded-2xl p-12 text-center text-muted-foreground">
+   732→                  <SearchIcon className="w-14 h-14 mx-auto mb-4" />
+   733→                  {tf("search.noResults", "No matching evidence found.")}
+   734→                </div>
+   735→              ) : (
+   736→                <div className="space-y-3">
+   737→                  {filteredResults.map((result) => {
+   738→                    const resultKey = result.id;
+   739→
+   740→                    return (
+   741→                      <div key={resultKey} className="glass-card rounded-xl p-4 hover:border-primary/30 transition-all">
+   742→                        <div className={result.result_type === "visual_asset" ? "flex flex-col sm:flex-row gap-4" : ""}>
+   743→                          {result.result_type === "visual_asset" && result.asset_id && (
+   744→                            <SmartThumbnail assetId={result.asset_id} alt={result.filename} />
+   745→                          )}
+   746→
+   747→                          <div className="flex-1 min-w-0 space-y-3">
+   748→                            <div className="flex items-start justify-between gap-3">
+   749→                              <button
+   750→                                type="button"
+   751→                                onClick={() => openResult(result)}
+   752→                                className="text-left font-semibold text-foreground hover:text-primary transition-colors line-clamp-2"
+   753→                              >
+   754→                                {result.filename}
+   755→                              </button>
+   756→                              <button
+   757→                                type="button"
+   758→                                onClick={() => openResult(result)}
+   759→                                className="p-2 rounded-lg bg-surface hover:bg-primary/10 text-primary transition-colors shrink-0"
+   760→                                title={tf("search.open", "Open")}
+   761→                              >
+   762→                                <Eye className="w-4 h-4" />
+   763→                              </button>
+   764→                            </div>
+   765→
+   766→                            <div className="flex flex-wrap items-center gap-2">
+   767→                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] bg-surface border border-border text-muted-foreground">
+   768→                                {result.result_type === "visual_asset" ? <ImageIcon className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
+   769→                                {sourceLabel(result, tf)}
+   770→                              </span>
+   771→                              <MatchReasons result={result} tf={tf} />
+   772→                              <PiiBadge pii={result.pii} compact />
+   773→                              {result.result_type === "document" && <VisualBadge visual={result.visual} compact />}
+   774→                            </div>
+   775→
+   776→                            {result.labels?.length > 0 && (
+   777→                              <div className="flex flex-wrap gap-1.5">
+   778→                                {result.labels.slice(0, 5).map((label) => (
+   779→                                  <span key={label} className="px-2 py-0.5 rounded-full text-[11px] bg-primary/10 text-primary border border-primary/20">
+   780→                                    {localizedVisualLabel(label, tf)}
+   781→                                  </span>
+   782→                                ))}
+   783→                              </div>
+   784→                            )}
+   785→
+   786→                            {result.snippet && (
+   787→                              <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
+   788→                                <HighlightedText text={result.snippet} query={query} />
+   789→                              </p>
+   790→                            )}
+   791→
+   792→                            {(result.pages?.length || 0) > 0 || (result.segments?.length || 0) > 0 ? (
+   793→                              <div className="flex flex-wrap gap-2 pt-1">
+   794→                                {result.pages?.slice(0, 5).map((pageNumber) => (
+   795→                                  <button
+   796→                                    key={`page-${pageNumber}`}
+   797→                                    type="button"
+   798→                                    onClick={() => openResultDocument(result, pageNumber, undefined)}
+   799→                                    className="px-2 py-1 text-[11px] rounded-md bg-surface border border-border text-primary hover:bg-primary/10 transition-colors"
+   800→                                  >
+   801→                                    {tf("search.page", "Page")} {pageNumber}
+   802→                                  </button>
+   803→                                ))}
+   804→                                {result.segments?.slice(0, 3).map((segment) => (
+   805→                                  <button
+   806→                                    key={`segment-${segment.start_time}`}
+   807→                                    type="button"
+   808→                                    onClick={() => openResultDocument(result, undefined, segment.start_time ?? undefined)}
+   809→                                    className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md bg-surface border border-border text-primary hover:bg-primary/10 transition-colors"
+   810→                                  >
+   811→                                    <Clock className="w-3 h-3" />
+   812→                                    {formatTime(segment.start_time || 0)}
+   813→                                  </button>
+   814→                                ))}
+   815→                              </div>
+   816→                            ) : null}
+   817→                          </div>
+   818→                        </div>
+   819→                      </div>
+   820→                    );
+   821→                  })}
+   822→                </div>
+   823→              )}
+   824→            </div>
+   825→          )}
+   826→        </div>
+   827→      </div>
+   828→    </AppLayout>
+   829→  );
+   830→}
+   831→

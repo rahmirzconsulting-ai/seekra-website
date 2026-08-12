@@ -1,0 +1,1367 @@
+     1→from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
+     2→from pydantic import BaseModel
+     3→from typing import Optional, List
+     4→from sqlalchemy.ext.asyncio import AsyncSession
+     5→from sqlalchemy import text as sql_text
+     6→from app.core.database import async_session, get_db
+     7→from app.api.auth import require_content_user
+     8→from app.models.user import User
+     9→from app.services.llm_gateway import llm_gateway
+    10→from app.services.embedding import get_embedding
+    11→from app.services.audit import audit_event
+    12→from app.services.pii_detection import detect_pii
+    13→from app.services.pii_policy import build_pii_notice, get_document_pii_map, pii_for_document
+    14→from app.services.permissions import permission_clause
+    15→from app.services.search_cache import cache_get_json, cache_set_json, stable_hash
+    16→from app.services.visual_ai import embed_visual_text
+    17→import asyncio
+    18→import json
+    19→import re
+    20→import time
+    21→import unicodedata
+    22→
+    23→router = APIRouter(prefix="/api/chat", tags=["chat"])
+    24→
+    25→TOP_K = 6           # fused hits for answer context (chunks + segments, RRF)
+    26→SUMMARY_K = 8       # retrieve more chunks when summarizing a specific document
+    27→RRF_K = 60          # Reciprocal Rank Fusion constant (aligned with search)
+    28→SIM_FLOOR = 0.44    # chunk vector-leg floor (aligned with search)
+    29→SOURCE_REL_DROP = 0.08  # citation sim band: keep docs within this of the top hit
+    30→
+    31→# Visual grounding (Step 16) — smart-search relevance parity
+    32→VISUAL_K = 3                     # max visual assets grounding one answer
+    33→VISUAL_SIM_FLOOR = 0.20          # visual vector candidacy floor
+    34→VISUAL_SEMANTIC_ONLY_FLOOR = 0.22
+    35→VISUAL_RELATIVE_DROP = 0.08  # Step 16.9: parity with SOURCE_REL_DROP text band
+    36→VISUAL_TIMEOUT = 2.5             # seconds; visual phase never blocks an answer
+    37→EMBEDDING_CACHE_TTL = 24 * 60 * 60
+    38→LABEL_CACHE_TTL = 15 * 60
+    39→
+    40→VISUAL_INTENT_TERMS = {
+    41→    "image", "images", "photo", "photos", "picture", "pictures", "screen",
+    42→    "video", "frame", "frames", "slide", "slides", "logo", "person",
+    43→    "people", "car", "vehicle", "machine", "machinery", "tv", "monitor",
+    44→    "document page", "scanned", "scan", "chart", "diagram",
+    45→    # Step 16.8: Arabic visual-intent terms (same semantics)
+    46→    "صورة", "صور", "فيديو", "لقطة", "لقطات", "إطار", "شعار", "سيارة",
+    47→    "سيارات", "شاحنة", "شخص", "أشخاص", "مخطط", "رسم",
+    48→}
+    49→
+    50→# Step 16.8: "which picture/files show X?" — listing intent gets a
+    51→# deterministic, type-accurate enumerated answer straight from visual
+    52→# evidence, never an LLM essay (no hedging, no apology, citations always match).
+    53→VISUAL_LISTING_MARKERS = [
+    54→    "which picture", "which pictures", "which photo", "which photos",
+    55→    "which image", "which images", "which files show", "which file shows",
+    56→    "which documents show", "which document shows", "what picture",
+    57→    "what pictures", "what photo", "what photos", "what image", "what images",
+    58→    "what files show", "show me images", "show me photos", "show me pictures",
+    59→    "show me a picture", "show me an image", "show me a photo",
+    60→    "أي صورة", "أي صور", "أي ملفات تظهر", "أي ملف يظهر",
+    61→    "اعرض صور", "أرني صورة", "أرني صور", "أين توجد صورة",
+    62→]
+    63→
+    64→# Bare "no information" answers display no sources (Step 16.8, R4 parity).
+    65→_NO_INFO_RE = re.compile(
+    66→    r"^(?:i don'?t have enough information in the documents|"
+    67→    r"[^\n]{0,60}معلومات كافية)",
+    68→    re.IGNORECASE)
+    69→
+    70→
+    71→def _is_visual_listing(q_lower: str) -> bool:
+    72→    return any(m in q_lower for m in VISUAL_LISTING_MARKERS)
+    73→
+    74→_VISUAL_MODEL_LOCK = asyncio.Lock()
+    75→
+    76→
+    77→class ChatRequest(BaseModel):
+    78→    question: str
+    79→    document_ids: Optional[List[int]] = None
+    80→    language: Optional[str] = None  # auto-detected if omitted
+    81→    history: Optional[List[dict]] = None  # Step 25: [{"role": "user"|"assistant", "content": str}]
+    82→
+    83→
+    84→class TtsRequest(BaseModel):
+    85→    text: str
+    86→    language: Optional[str] = None  # "ar" | "en"; auto-detected if omitted
+    87→
+    88→STOPWORDS = {"document", "doc", "file", "paper", "pdf", "report", "list",
+    89→             "the", "a", "an", "of", "مستند", "ملف", "وثيقة"}
+    90→
+    91→# Filename tokens too generic to single-handedly scope retrieval to one file
+    92→GENERIC_NAME_WORDS = {"safety", "guide", "report", "maintenance", "schedule",
+    93→                      "meeting", "notes", "training", "video", "budget",
+    94→                      "equipment", "parts", "catalog", "proposal", "factory",
+    95→                      "expansion", "onboarding", "earnings", "briefing",
+    96→                      "server", "paper", "summary", "monthly", "weekly",
+    97→                      "annual", "quarterly", "plan", "plans", "policy",
+    98→                      # Step 16.8: common content nouns — "top-selling product line"
+    99→                      # must NOT scope retrieval to 04_Product_Roadmap, and
+   100→                      # "which files show a warehouse" must NOT scope to files
+   101→                      # that merely have 'warehouse' in their name.
+   102→                      "product", "products", "warehouse", "sales", "revenue",
+   103→                      "image", "images", "picture", "pictures", "photo", "photos",
+   104→                      "customer", "customers", "inspection", "procedures",
+   105→                      "city", "street", "traffic", "finance", "desk", "team",
+   106→                      "site", "walkthrough", "break", "room"}
+   107→
+   108→LATEST_MARKERS = ["latest", "newest", "most recent", "last document",
+   109→                  "أحدث", "آخر", "الأخير", "الاخير"]
+   110→SUMMARY_MARKERS = ["summarize", "summary", "sum up", "لخص", "تلخيص", "ملخص", "لخّص"]
+   111→
+   112→# Library meta-questions — answered deterministically from the DB, never via LLM
+   113→INVENTORY_MARKERS = ["how many document", "how many file", "list document",
+   114→                     "list file", "list all", "what documents", "what files",
+   115→                     "show documents", "show files", "available documents",
+   116→                     "available files", "documents do you have", "files do you have",
+   117→                     "documents are available", "files are available",
+   118→                     # Step 16.8: bare "كم عدد" removed — "how many days of leave?"
+   119→                     # (كم عدد أيام الإجازة) is NOT a library-inventory question.
+   120→                     "كم عدد الملفات", "كم عدد المستندات",
+   121→                     "عدد المستندات", "عدد الملفات", "كم مستند", "كم ملف",
+   122→                     "اعرض الملفات", "اعرض المستندات", "قائمة الملفات",
+   123→                     "قائمة المستندات", "ما هي المستندات", "ما هي الملفات",
+   124→                     "الملفات المتوفرة", "المستندات المتوفرة"]
+   125→
+   126→
+   127→SUPPORTED_LANGS = ("ar", "en", "ur", "hi")
+   128→LANG_NAMES = {"ar": "Arabic", "en": "English", "ur": "Urdu", "hi": "Hindi"}
+   129→
+   130→
+   131→def detect_language(text: str) -> str:
+   132→    sample = (text or "")[:1000]
+   133→    # Step 30E: Urdu-specific Nastaliq letters (never used in Arabic):
+   134→    # ٹ ڈ ڑ ں ھ ہ ے
+   135→    urdu = len(re.findall(r"[\u0679\u0688\u0691\u06BA\u06BE\u06C1\u06D2]", sample))
+   136→    if urdu > 0:
+   137→        return "ur"
+   138→    arabic = len(re.findall(r"[\u0600-\u06FF]", sample))
+   139→    latin = len(re.findall(r"[a-zA-Z]", sample))
+   140→    return "ar" if arabic > latin else "en"
+   141→
+   142→
+   143→# ---- Step 25: follow-up contextualization -----------------------------------
+   144→HISTORY_TURNS = 6          # last N turns sent by the client
+   145→REWRITE_TIMEOUT = 12.0     # seconds; rewrite never blocks the answer
+   146→FOLLOWUP_MARKERS = [
+   147→    "this", " it ", "that", "these", "those", "the book", "the document",
+   148→    "the file", "the same", "what about", "and what", "also",
+   149→    "\u0647\u0630\u0627", "\u0647\u0630\u0647", "\u0630\u0644\u0643",
+   150→    "\u0627\u0644\u0643\u062a\u0627\u0628", "\u0627\u0644\u0645\u0633\u062a\u0646\u062f",
+   151→    "\u0627\u0644\u0645\u0644\u0641", "\u0646\u0641\u0633",
+   152→]
+   153→
+   154→
+   155→def _looks_like_followup(question: str) -> bool:
+   156→    words = question.split()
+   157→    if len(words) <= 6:
+   158→        return True
+   159→    padded = f" {question.lower()} "
+   160→    return any(m in padded for m in FOLLOWUP_MARKERS)
+   161→
+   162→
+   163→def _format_history(history: list[dict], max_chars: int = 1200) -> str:
+   164→    lines = []
+   165→    for turn in history[-HISTORY_TURNS:]:
+   166→        role = "User" if (turn.get("role") or "") == "user" else "Assistant"
+   167→        content = " ".join(str(turn.get("content") or "").split())[:400]
+   168→        if content:
+   169→            lines.append(f"{role}: {content}")
+   170→    text = "\n".join(lines)
+   171→    return text[-max_chars:] if len(text) > max_chars else text
+   172→
+   173→
+   174→async def _contextualize_question(question: str, history: list[dict], lang: str) -> str:
+   175→    """Rewrite a follow-up into a standalone retrieval query (fail-open)."""
+   176→    if not history or not _looks_like_followup(question):
+   177→        return question
+   178→    lang_name = LANG_NAMES.get(lang, "English")
+   179→    prompt = (
+   180→        "You rewrite follow-up questions into standalone search questions for a "
+   181→        "document search system. Given the conversation and the follow-up, output "
+   182→        "ONLY the rewritten standalone question in " + lang_name + ". Resolve "
+   183→        "references like 'this book', 'it', 'that document' to the specific "
+   184→        "document or topic named earlier in the conversation. Do NOT answer the "
+   185→        "question. If the follow-up is already standalone, output it unchanged.\n\n"
+   186→        "Conversation:\n" + _format_history(history) + "\n\n"
+   187→        "Follow-up: " + question + "\n\nStandalone question:"
+   188→    )
+   189→    try:
+   190→        rewritten = await asyncio.wait_for(
+   191→            llm_gateway._generate(prompt, max_tokens=60, kind="chat"),
+   192→            timeout=REWRITE_TIMEOUT)
+   193→        rewritten = unicodedata.normalize("NFKC", (rewritten or "").strip().strip('"').strip())
+   194→        first_line = rewritten.splitlines()[0].strip() if rewritten else ""
+   195→        if first_line and len(first_line) <= 400:
+   196→            return first_line
+   197→    except Exception:
+   198→        pass  # timeout / provider error -> original question
+   199→    return question
+   200→
+   201→
+   202→def _rrf(rank):
+   203→    return 0.0 if rank is None else 1.0 / (RRF_K + rank)
+   204→
+   205→
+   206→def _or_query(query: str) -> str:
+   207→    terms = [t for t in re.findall(r"\w+", query, flags=re.UNICODE) if t not in STOPWORDS][:8]
+   208→    return " | ".join(terms) if terms else ""
+   209→
+   210→
+   211→def _type_label(content_type: str, filename: str = "") -> str:
+   212→    ct = (content_type or "").lower()
+   213→    ext = (filename.rsplit(".", 1)[-1] if "." in filename else "").lower()
+   214→    if "pdf" in ct or ext == "pdf":
+   215→        return "PDF"
+   216→    if ct.startswith("image") or ct == "images" or ext in ("jpg", "jpeg", "png", "gif", "webp", "bmp"):
+   217→        return "images"
+   218→    if ct.startswith("audio") or ct == "audio" or ext in ("mp3", "wav", "m4a", "ogg", "flac"):
+   219→        return "audio"
+   220→    if ct.startswith("video") or ct == "video" or ext in ("mp4", "mov", "webm", "mkv", "avi"):
+   221→        return "video"
+   222→    if any(x in ct for x in ("word", "presentation", "sheet", "officedocument")) or ct == "office" \
+   223→            or ext in ("doc", "docx", "ppt", "pptx", "xls", "xlsx", "csv"):
+   224→        return "Office"
+   225→    if ct.startswith("text") or ext in ("txt", "md"):
+   226→        return "text"
+   227→    return "other"
+   228→
+   229→
+   230→async def resolve_target_documents(question: str, db: AsyncSession, user=None) -> list[int]:
+   231→    """Resolve meta-references: 'latest document' intent + filename mentions."""
+   232→    q_lower = question.lower()
+   233→    perm_params: dict = {}
+   234→    perm_sql = permission_clause(user, perm_params, "documents")
+   235→
+   236→    # 1. "latest / newest document" intent (EN + AR)
+   237→    if any(m in q_lower for m in LATEST_MARKERS):
+   238→        result = await db.execute(sql_text(
+   239→            f"SELECT id FROM documents WHERE {perm_sql} ORDER BY created_at DESC LIMIT 1"), perm_params)
+   240→        row = result.first()
+   241→        return [row[0]] if row else []
+   242→
+   243→    # 2. Filename mention detection (distinctive tokens, e.g. "honda", "mant aq")
+   244→    result = await db.execute(sql_text(f"SELECT id, filename FROM documents WHERE {perm_sql}"), perm_params)
+   245→    q_tokens = set(re.findall(r"\w+", q_lower)) - STOPWORDS
+   246→    matched = []
+   247→    for row in result.fetchall():
+   248→        name_tokens = set(re.sub(r"[._\-]", " ", row.filename.lower()).split()) - STOPWORDS
+   249→        overlap = name_tokens & q_tokens
+   250→        distinctive = {t for t in overlap if len(t) >= 4 and t not in GENERIC_NAME_WORDS}
+   251→        # scope only on strong evidence: >=2 shared tokens, or one distinctive token
+   252→        if len(overlap) >= 2 or (len(overlap) == 1 and distinctive):
+   253→            matched.append(row.id)
+   254→    return matched
+   255→
+   256→
+   257→async def _known_visual_labels() -> set[str]:
+   258→    """Distinct detected object labels (shared cache key with smart search)."""
+   259→    cache_key = "seekra:smart-search:visual-labels:v1"
+   260→    cached = await cache_get_json(cache_key)
+   261→    if isinstance(cached, list):
+   262→        return {str(label).lower() for label in cached}
+   263→    async with async_session() as session:
+   264→        result = await session.execute(
+   265→            sql_text("SELECT DISTINCT lower(label) AS label FROM visual_labels"))
+   266→    labels = [row.label for row in result.mappings() if row.label]
+   267→    await cache_set_json(cache_key, labels, LABEL_CACHE_TTL)
+   268→    return set(labels)
+   269→
+   270→
+   271→async def _cached_visual_embedding(query: str) -> list[float] | None:
+   272→    """Visual-text embedding (shared cache key with smart search)."""
+   273→    cache_key = f"seekra:embedding:visual-text:{stable_hash(query)}"
+   274→    cached = await cache_get_json(cache_key)
+   275→    if isinstance(cached, list):
+   276→        return [float(x) for x in cached]
+   277→    async with _VISUAL_MODEL_LOCK:
+   278→        vector = await asyncio.to_thread(embed_visual_text, query)
+   279→    await cache_set_json(cache_key, vector, EMBEDDING_CACHE_TTL)
+   280→    return vector
+   281→
+   282→
+   283→async def warm_visual_model() -> None:
+   284→    """Preload the visual embedding model at startup (Step 16.7).
+   285→
+   286→    The first embed call after a backend boot loads the model weights
+   287→    (multi-second on CPU). Without warmup that cost lands inside the
+   288→    per-answer timeout, so the first visual question gets exact-leg-only
+   289→    results while later questions get full semantic results — the same
+   290→    question appears to return different sources. Warming at startup makes
+   291→    every question run the identical full pipeline."""
+   292→    try:
+   293→        async with _VISUAL_MODEL_LOCK:
+   294→            await asyncio.to_thread(embed_visual_text, "seekra visual model warmup")
+   295→        print("[CHAT] visual model warmup complete")
+   296→    except Exception as exc:
+   297→        print(f"[CHAT] visual model warmup failed: {type(exc).__name__}")
+   298→
+   299→
+   300→def _visual_scope(target_ids: list[int], params: dict) -> str:
+   301→    if target_ids:
+   302→        params["doc_ids"] = target_ids
+   303→        return " AND va.document_id = ANY(CAST(:doc_ids AS int[]))"
+   304→    return ""
+   305→
+   306→
+   307→async def _visual_ocr_leg(question: str, target_ids: list[int], fetch: int = 8, user=None) -> list[dict]:
+   308→    params: dict = {"query": question, "fetch": fetch}
+   309→    scope = _visual_scope(target_ids, params)
+   310→    scope += " AND (" + permission_clause(user, params, "d") + ")"
+   311→    async with async_session() as session:
+   312→        rows = (await session.execute(sql_text(f"""
+   313→            SELECT va.id AS asset_id, va.document_id, va.asset_type, va.page_number,
+   314→                   va.start_time, va.end_time, va.ocr_text,
+   315→                   ts_rank(to_tsvector('simple', coalesce(va.ocr_text, '')),
+   316→                           websearch_to_tsquery('simple', :query)) AS score,
+   317→                   d.filename
+   318→            FROM visual_assets va
+   319→            JOIN documents d ON d.id = va.document_id
+   320→            WHERE COALESCE(d.status, 'completed') = 'completed'
+   321→              AND to_tsvector('simple', coalesce(va.ocr_text, '')) @@ websearch_to_tsquery('simple', :query){scope}
+   322→            ORDER BY score DESC, va.id
+   323→            LIMIT :fetch
+   324→        """), params)).mappings().all()
+   325→    return [dict(r) for r in rows]
+   326→
+   327→
+   328→async def _visual_object_leg(object_terms: list[str], target_ids: list[int], fetch: int = 8, user=None) -> list[dict]:
+   329→    params: dict = {"labels": object_terms, "fetch": fetch}
+   330→    scope = _visual_scope(target_ids, params)
+   331→    scope += " AND (" + permission_clause(user, params, "d") + ")"
+   332→    async with async_session() as session:
+   333→        rows = (await session.execute(sql_text(f"""
+   334→            SELECT va.id AS asset_id, va.document_id, va.asset_type, va.page_number,
+   335→                   va.start_time, va.end_time, va.ocr_text,
+   336→                   MAX(vl.confidence) AS score,
+   337→                   d.filename
+   338→            FROM visual_assets va
+   339→            JOIN visual_labels vl ON vl.asset_id = va.id
+   340→            JOIN documents d ON d.id = va.document_id
+   341→            WHERE COALESCE(d.status, 'completed') = 'completed'
+   342→              AND lower(vl.label) = ANY(CAST(:labels AS text[])){scope}
+   343→            GROUP BY va.id, d.id
+   344→            ORDER BY score DESC, va.id
+   345→            LIMIT :fetch
+   346→        """), params)).mappings().all()
+   347→    return [dict(r) for r in rows]
+   348→
+   349→
+   350→async def _visual_vector_leg(question: str, target_ids: list[int], fetch: int = 8, user=None) -> list[dict]:
+   351→    embedding = await _cached_visual_embedding(question)
+   352→    if not embedding:
+   353→        return []
+   354→    params: dict = {"emb": str(embedding), "fetch": fetch}
+   355→    scope = _visual_scope(target_ids, params)
+   356→    scope += " AND (" + permission_clause(user, params, "d") + ")"
+   357→    async with async_session() as session:
+   358→        rows = (await session.execute(sql_text(f"""
+   359→            SELECT va.id AS asset_id, va.document_id, va.asset_type, va.page_number,
+   360→                   va.start_time, va.end_time, va.ocr_text,
+   361→                   1 - (va.embedding <=> CAST(:emb AS vector)) AS score,
+   362→                   d.filename
+   363→            FROM visual_assets va
+   364→            JOIN documents d ON d.id = va.document_id
+   365→            WHERE COALESCE(d.status, 'completed') = 'completed'
+   366→              AND va.embedding IS NOT NULL{scope}
+   367→            ORDER BY va.embedding <=> CAST(:emb AS vector)
+   368→            LIMIT :fetch
+   369→        """), params)).mappings().all()
+   370→    return [dict(r) for r in rows if float(r["score"] or 0) >= VISUAL_SIM_FLOOR]
+   371→
+   372→
+   373→async def _visual_evidence_inner(question: str, target_ids: list[int], has_text_rows: bool, user=None) -> tuple[list[dict], dict[str, int]]:
+   374→    """OCR + object + (gated) semantic visual legs, RRF-fused with smart-search
+   375→    qualification rules. The semantic leg only runs on visual intent or when the
+   376→    text legs found nothing — the visual model never slows down a text answer."""
+   377→    try:
+   378→        known_labels = await _known_visual_labels()
+   379→    except Exception:
+   380→        known_labels = set()
+   381→    q_lower = question.lower()
+   382→    q_terms = {t for t in re.findall(r"\w+", q_lower) if t not in STOPWORDS}
+   383→    object_terms = sorted(q_terms & known_labels)
+   384→    # Step 16.9: listing questions ("which files show X?") count as visual
+   385→    # intent — otherwise the semantic leg stays off whenever text rows exist
+   386→    # and the listing path never sees the visual matches (V3 regression).
+   387→    visual_intent = bool(object_terms or _is_visual_listing(q_lower)
+   388→                         or any(term in q_lower for term in VISUAL_INTENT_TERMS))
+   389→
+   390→    # Exact legs (OCR + detected objects): fast indexed SQL, always collected.
+   391→    exact_legs = ["ocr"]
+   392→    exact_tasks = [_visual_ocr_leg(question, target_ids, user=user)]
+   393→    if object_terms:
+   394→        exact_legs.append("object")
+   395→        exact_tasks.append(_visual_object_leg(object_terms, target_ids, user=user))
+   396→    exact_results = await asyncio.gather(*exact_tasks, return_exceptions=True)
+   397→    leg_rows = {leg: rows for leg, rows in zip(exact_legs, exact_results) if isinstance(rows, list)}
+   398→
+   399→    # Semantic leg: isolated timeout — a cold visual model (first question after
+   400→    # a backend restart) must never cancel the exact legs that already answered.
+   401→    if visual_intent or not has_text_rows:
+   402→        try:
+   403→            leg_rows["vector"] = await asyncio.wait_for(
+   404→                _visual_vector_leg(question, target_ids, user=user), timeout=VISUAL_TIMEOUT)
+   405→        except Exception:
+   406→            leg_rows["vector"] = []
+   407→
+   408→    leg_counts = {leg: len(rows) for leg, rows in leg_rows.items()}
+   409→
+   410→    assets: dict[int, dict] = {}
+   411→    for leg_name in ("ocr", "object", "vector"):
+   412→        for rank, row in enumerate(leg_rows.get(leg_name, []), start=1):
+   413→            asset_id = int(row["asset_id"])
+   414→            item = assets.setdefault(asset_id, {
+   415→                "asset_id": asset_id, "document_id": int(row["document_id"]),
+   416→                "filename": row["filename"], "asset_type": row.get("asset_type"),
+   417→                "page_number": row.get("page_number"), "start_time": row.get("start_time"),
+   418→                "ocr_text": row.get("ocr_text") or "", "score": 0.0,
+   419→                "labels": [], "_legs": set(), "_vector_scores": []})
+   420→            if leg_name not in item["_legs"]:
+   421→                item["_legs"].add(leg_name)
+   422→                item["score"] += _rrf(rank)
+   423→            if leg_name == "vector":
+   424→                item["_vector_scores"].append(float(row.get("score") or 0))
+   425→
+   426→    top_vector = max((s for item in assets.values() for s in item["_vector_scores"]), default=0.0)
+   427→    semantic_floor = max(VISUAL_SEMANTIC_ONLY_FLOOR, top_vector - VISUAL_RELATIVE_DROP)
+   428→    qualified = []
+   429→    for item in assets.values():
+   430→        exact = bool(item["_legs"] & {"ocr", "object"})
+   431→        best_vector = max(item["_vector_scores"], default=0.0)
+   432→        if not exact and best_vector < semantic_floor:
+   433→            continue  # weak semantic-only visual hit (Step 14.4 parity)
+   434→        item["exact"] = exact  # Step 16.8: certainty flag survives leg teardown
+   435→        qualified.append(item)
+   436→    # Stability (Step 16.7): exact hits (OCR text / detected object labels) are
+   437→    # certain matches — they pin above the VISUAL_K cut and can never be
+   438→    # displaced by semantic-only vector guesses, which only fill remaining
+   439→    # slots. Deterministic tiebreaks keep repeated identical questions
+   440→    # identical whether the vector leg ran warm, cold, or not at all.
+   441→    qualified.sort(key=lambda item: (
+   442→        0 if item["_legs"] & {"ocr", "object"} else 1,
+   443→        -item["score"],
+   444→        item["asset_id"],
+   445→    ))
+   446→    # Step 16.9: document diversity — each distinct document takes one slot
+   447→    # first, then remaining slots fill by rank. A stack of near-duplicate
+   448→    # frames from one video can no longer crowd out distinct matching
+   449→    # documents (the meeting photo behind three meeting video frames).
+   450→    _first_pass, _second_pass, _seen_docs = [], [], set()
+   451→    for item in qualified:
+   452→        if item["document_id"] not in _seen_docs:
+   453→            _seen_docs.add(item["document_id"])
+   454→            _first_pass.append(item)
+   455→        else:
+   456→            _second_pass.append(item)
+   457→    qualified = (_first_pass + _second_pass)[:VISUAL_K]
+   458→    if not qualified:
+   459→        return [], leg_counts, visual_intent
+   460→
+   461→    async with async_session() as session:
+   462→        label_rows = (await session.execute(sql_text("""
+   463→            SELECT asset_id, label, confidence
+   464→            FROM visual_labels
+   465→            WHERE asset_id = ANY(CAST(:asset_ids AS int[]))
+   466→            ORDER BY asset_id, confidence DESC
+   467→        """), {"asset_ids": [item["asset_id"] for item in qualified]})).mappings().all()
+   468→    labels: dict[int, list[str]] = {}
+   469→    for row in label_rows:
+   470→        entries = labels.setdefault(int(row.asset_id), [])
+   471→        if len(entries) < 4 and row.label not in entries:
+   472→            entries.append(row.label)
+   473→    for item in qualified:
+   474→        item["labels"] = labels.get(item["asset_id"], [])
+   475→        item["score"] = round(item["score"], 6)
+   476→        item.pop("_legs", None)
+   477→        item.pop("_vector_scores", None)
+   478→    return qualified, leg_counts, visual_intent
+   479→
+   480→
+   481→async def _chat_visual_evidence(question: str, target_ids: list[int], has_text_rows: bool, user=None) -> list[dict]:
+   482→    """Visual grounding for one chat answer; never raises, never blocks.
+   483→    Always logs one line so visual behavior is diagnosable from backend logs."""
+   484→    started = time.perf_counter()
+   485→    try:
+   486→        hits, leg_counts, visual_intent = await asyncio.wait_for(
+   487→            _visual_evidence_inner(question, target_ids, has_text_rows, user),
+   488→            timeout=VISUAL_TIMEOUT + 1.5,  # exact legs budget; vector leg has its own
+   489→        )
+   490→        ms = int((time.perf_counter() - started) * 1000)
+   491→        print(f"[CHAT] visual_ms={ms} visual_legs={leg_counts} visual_hits={len(hits)}")
+   492→        return hits, visual_intent
+   493→    except Exception as exc:
+   494→        print(f"[CHAT] visual grounding unavailable: {type(exc).__name__}")
+   495→        return [], False  # missing tables / DB error -> text-only answer
+   496→
+   497→
+   498→@router.post("/")
+   499→async def chat(req: ChatRequest, current_user: User = Depends(require_content_user()), db: AsyncSession = Depends(get_db)):
+   500→    try:
+   501→        question = unicodedata.normalize("NFKC", (req.question or "").strip())
+   502→        if not question:
+   503→            return {"answer": "Please type a question.", "question": req.question}
+   504→
+   505→        lang = req.language if req.language in SUPPORTED_LANGS else detect_language(question)
+   506→        q_lower = question.lower()
+   507→
+   508→        # Step 25: resolve follow-up references ("this book", "it") into a
+   509→        # standalone query BEFORE any retrieval; the original wording is kept
+   510→        # for the answer itself.
+   511→        history = [t for t in (req.history or []) if isinstance(t, dict)][-HISTORY_TURNS:]
+   512→        retrieval_query = await _contextualize_question(question, history, lang) if history else question
+   513→
+   514→        # 0. Library inventory meta-question -> deterministic DB answer (no LLM,
+   515→        #    no hallucination possible — governance-friendly by construction)
+   516→        if any(m in q_lower for m in INVENTORY_MARKERS):
+   517→            perm_params: dict = {}
+   518→            perm_sql = permission_clause(current_user, perm_params, "documents")
+   519→            all_docs = (await db.execute(sql_text(
+   520→                f"SELECT id, filename, content_type FROM documents WHERE {perm_sql} ORDER BY created_at DESC"
+   521→            ), perm_params)).mappings().all()
+   522→            total = len(all_docs)
+   523→            counts = {}
+   524→            for r in all_docs:
+   525→                lbl = _type_label(r["content_type"], r["filename"] or "")
+   526→                counts[lbl] = counts.get(lbl, 0) + 1
+   527→            recent = all_docs[:10]
+   528→            ordered = sorted(counts.items(), key=lambda x: -x[1])
+   529→            if lang == "ar":
+   530→                parts = "، ".join(f"{n} {k}" for k, n in ordered)
+   531→                lines = [f"تحتوي المكتبة على {total} مستندًا." + (f" ({parts})" if parts else "")]
+   532→                if recent:
+   533→                    lines.append(f"أحدث الملفات المرفوعة (عرض {len(recent)} من {total}):")
+   534→                    lines += [f"{i+1}. {r['filename']}" for i, r in enumerate(recent)]
+   535→            else:
+   536→                parts = ", ".join(f"{n} {k}" for k, n in ordered)
+   537→                lines = [f"There are {total} documents in the library." + (f" ({parts})" if parts else "")]
+   538→                if recent:
+   539→                    lines.append(f"Most recent uploads (showing {len(recent)} of {total}):")
+   540→                    lines += [f"{i+1}. {r['filename']}" for i, r in enumerate(recent)]
+   541→            sources = [{"document_id": r["id"], "filename": r["filename"], "score": 1.0,
+   542→                        "pages": [], "start_time": None} for r in recent[:5]]
+   543→            pii_map = await get_document_pii_map(db, [s["document_id"] for s in sources])
+   544→            for source in sources:
+   545→                source["pii"] = pii_for_document(pii_map, source["document_id"])
+   546→            pii_notice = build_pii_notice(pii_map, [s["document_id"] for s in sources])
+   547→            if pii_notice["flagged_documents"]:
+   548→                await audit_event(
+   549→                    db,
+   550→                    None,
+   551→                    current_user.id,
+   552→                    "CONTENT_PII_FLAGGED_RESULT",
+   553→                    f"Chat returned {pii_notice['flagged_documents']} PII-flagged document(s)",
+   554→                )
+   555→            return {"answer": "\n".join(lines), "question": req.question, "sources": sources, "pii_notice": pii_notice}
+   556→
+   557→        # 0b. PII direct lookup — a question naming an exact email / IBAN / ID is
+   558→        #     answered deterministically from masked findings (no LLM, no leak):
+   559→        #     mask the question's PII with the same functions used at indexing and
+   560→        #     compare masked samples. No match -> normal retrieval below.
+   561→        q_findings = detect_pii(question)
+   562→        if q_findings:
+   563→            masked_samples = sorted({f["masked_sample"] for f in q_findings if f.get("masked_sample")})
+   564→            hit_rows = []
+   565→            if masked_samples:
+   566→                hit_rows = (await db.execute(sql_text("""
+   567→                    SELECT pf.document_id, d.filename, pf.pii_type, pf.page_number
+   568→                    FROM pii_findings pf
+   569→                    JOIN documents d ON d.id = pf.document_id
+   570→                    WHERE pf.masked_sample = ANY(CAST(:samples AS text[]))
+   571→                    ORDER BY pf.document_id, pf.page_number NULLS LAST
+   572→                    LIMIT 20
+   573→                """), {"samples": masked_samples})).mappings().all()
+   574→            if hit_rows:
+   575→                by_doc: dict[int, dict] = {}
+   576→                for r in hit_rows:
+   577→                    entry = by_doc.setdefault(int(r["document_id"]), {
+   578→                        "filename": r["filename"], "pages": []})
+   579→                    if r["page_number"] is not None and r["page_number"] not in entry["pages"] and len(entry["pages"]) < 3:
+   580→                        entry["pages"].append(int(r["page_number"]))
+   581→                sample_list = ("، ".join(masked_samples)) if lang == "ar" else ", ".join(masked_samples)
+   582→                if lang == "ar":
+   583→                    lines = [f"تم العثور على {sample_list} في {len(by_doc)} مستندًا:"]
+   584→                    for i, e in enumerate(by_doc.values(), 1):
+   585→                        pages = f" (صفحات {', '.join(map(str, sorted(e['pages'])))})" if e["pages"] else ""
+   586→                        lines.append(f"{i}. {e['filename']}{pages}")
+   587→                    lines.append("(تمت المطابقة بالقيم المقنّعة حفاظًا للخصوصية.)")
+   588→                else:
+   589→                    lines = [f"Found {sample_list} in {len(by_doc)} document(s):"]
+   590→                    for i, e in enumerate(by_doc.values(), 1):
+   591→                        pages = f" (pages {', '.join(map(str, sorted(e['pages'])))})" if e["pages"] else ""
+   592→                        lines.append(f"{i}. {e['filename']}{pages}")
+   593→                    lines.append("(Matched in masked form to protect privacy.)")
+   594→                doc_ids = list(by_doc.keys())
+   595→                pii_map = await get_document_pii_map(db, doc_ids)
+   596→                sources = [{"document_id": doc_id, "filename": e["filename"], "score": 1.0,
+   597→                            "pages": sorted(e["pages"]), "start_time": None,
+   598→                            "pii": pii_for_document(pii_map, doc_id)}
+   599→                           for doc_id, e in by_doc.items()]
+   600→                pii_notice = build_pii_notice(pii_map, doc_ids)
+   601→                await audit_event(
+   602→                    db, None, current_user.id, "CHAT_PII_LOOKUP",
+   603→                    f"{current_user.username} looked up {len(masked_samples)} masked PII sample(s); {len(by_doc)} document(s) matched",
+   604→                )
+   605→                return {"answer": "\n".join(lines), "question": req.question,
+   606→                        "sources": sources, "pii_notice": pii_notice}
+   607→
+   608→        # 1. Resolve which documents the question refers to (meta-queries)
+   609→        target_ids = list(req.document_ids) if req.document_ids else []
+   610→        if not target_ids:
+   611→            target_ids = await resolve_target_documents(retrieval_query, db, current_user)
+   612→
+   613→        # 2. Embed the question with bge-m3 (blocking -> thread; degrade to
+   614→        #    keyword-only if the embedding service fails)
+   615→        try:
+   616→            q_emb = await asyncio.to_thread(get_embedding, retrieval_query)
+   617→            emb_str = "[" + ",".join(f"{x:.6f}" for x in q_emb) + "]"
+   618→        except Exception:
+   619→            emb_str = None
+   620→
+   621→        # 3. Hybrid retrieval on chunks — vector leg + full-text leg, RRF-fused
+   622→        #    (aligned with /api/search; cross-language semantic kept on purpose)
+   623→        wants_summary = any(m in q_lower for m in SUMMARY_MARKERS)
+   624→        k = SUMMARY_K if (wants_summary and target_ids) else TOP_K
+   625→
+   626→        perm_params: dict = {}
+   627→        perm_and = " AND (" + permission_clause(current_user, perm_params, "d") + ")"
+   628→        params = {"qtext": retrieval_query, "fetch_n": max(20, k * 5), **perm_params}
+   629→        scope_and = ""
+   630→        if target_ids:
+   631→            scope_and = " AND c.document_id = ANY(CAST(:doc_ids AS int[]))"
+   632→            params["doc_ids"] = target_ids
+   633→
+   634→        # ---- leg 1: vector on chunks (floor; no band — chat wants recall) ----
+   635→        vec_rows = []
+   636→        if emb_str:
+   637→            vec_sql = sql_text(f"""
+   638→                SELECT c.id, c.chunk_text, c.document_id, c.page_number, d.filename,
+   639→                       1 - (c.embedding <=> CAST(:emb AS vector)) AS similarity
+   640→                FROM document_chunks c
+   641→                JOIN documents d ON d.id = c.document_id
+   642→                WHERE c.embedding IS NOT NULL{scope_and}{perm_and}
+   643→                ORDER BY c.embedding <=> CAST(:emb AS vector)
+   644→                LIMIT :fetch_n
+   645→            """)
+   646→            vec_rows = (await db.execute(vec_sql, {**params, "emb": emb_str})).mappings().all()
+   647→            vec_rows = [r for r in vec_rows if float(r["similarity"]) >= SIM_FLOOR]
+   648→
+   649→        # ---- leg 2: full-text on chunks (AND via websearch; OR fallback unless quoted) ----
+   650→        fts_sql = sql_text(f"""
+   651→            SELECT c.id, c.chunk_text, c.document_id, c.page_number, d.filename,
+   652→                   ts_rank_cd(c.search_vector, websearch_to_tsquery('english', :qtext)) AS kw_score
+   653→            FROM document_chunks c
+   654→            JOIN documents d ON d.id = c.document_id
+   655→            WHERE c.search_vector @@ websearch_to_tsquery('english', :qtext){scope_and}{perm_and}
+   656→            ORDER BY kw_score DESC
+   657→            LIMIT :fetch_n
+   658→        """)
+   659→        fts_rows = (await db.execute(fts_sql, params)).mappings().all()
+   660→
+   661→        if not fts_rows and '"' not in retrieval_query:
+   662→            orq = _or_query(retrieval_query)
+   663→            if orq:
+   664→                fts_or_sql = sql_text(f"""
+   665→                    SELECT c.id, c.chunk_text, c.document_id, c.page_number, d.filename,
+   666→                           ts_rank_cd(c.search_vector, to_tsquery('english', :orq)) AS kw_score
+   667→                    FROM document_chunks c
+   668→                    JOIN documents d ON d.id = c.document_id
+   669→                    WHERE c.search_vector @@ to_tsquery('english', :orq){scope_and}{perm_and}
+   670→                    ORDER BY kw_score DESC
+   671→                    LIMIT :fetch_n
+   672→                """)
+   673→                fts_rows = (await db.execute(fts_or_sql, {**params, "orq": orq})).mappings().all()
+   674→
+   675→        # ---- leg 3: vector on A/V segments (search parity — A/V text lives here) ----
+   676→        seg_leg_rows = []
+   677→        if emb_str:
+   678→            seg_scope_and = scope_and.replace("c.document_id", "s.document_id")
+   679→            seg_sql = sql_text(f"""
+   680→                SELECT s.id, s.segment_text, s.document_id, s.start_time, d.filename,
+   681→                       1 - (s.embedding <=> CAST(:emb AS vector)) AS similarity
+   682→                FROM document_segments s
+   683→                JOIN documents d ON d.id = s.document_id
+   684→                WHERE s.embedding IS NOT NULL{seg_scope_and}{perm_and}
+   685→                ORDER BY s.embedding <=> CAST(:emb AS vector)
+   686→                LIMIT :fetch_n
+   687→            """)
+   688→            try:
+   689→                seg_leg_rows = (await db.execute(seg_sql, {**params, "emb": emb_str})).mappings().all()
+   690→                seg_leg_rows = [r for r in seg_leg_rows if float(r["similarity"]) >= 0.50]
+   691→            except Exception:
+   692→                seg_leg_rows = []
+   693→
+   694→        # ---- RRF fusion (chunks + segments; prefixed keys avoid id collisions) ----
+   695→        chunks = {}
+   696→        for rank, r in enumerate(vec_rows, start=1):
+   697→            e = chunks.setdefault(f"c{r['id']}", {
+   698→                "chunk_text": r["chunk_text"], "document_id": r["document_id"],
+   699→                "filename": r["filename"], "page_number": r["page_number"], "start_time": None,
+   700→                "similarity": round(float(r["similarity"]), 3),
+   701→                "v_rank": None, "f_rank": None, "s_rank": None})
+   702→            e["v_rank"] = rank
+   703→        for rank, r in enumerate(fts_rows, start=1):
+   704→            e = chunks.setdefault(f"c{r['id']}", {
+   705→                "chunk_text": r["chunk_text"], "document_id": r["document_id"],
+   706→                "filename": r["filename"], "page_number": r["page_number"], "start_time": None,
+   707→                "similarity": None, "v_rank": None, "f_rank": None, "s_rank": None})
+   708→            e["f_rank"] = rank
+   709→        for rank, r in enumerate(seg_leg_rows, start=1):
+   710→            e = chunks.setdefault(f"s{r['id']}", {
+   711→                "chunk_text": r["segment_text"], "document_id": r["document_id"],
+   712→                "filename": r["filename"], "page_number": None,
+   713→                "start_time": round(float(r["start_time"] or 0), 1),
+   714→                "similarity": round(float(r["similarity"]), 3),
+   715→                "v_rank": None, "f_rank": None, "s_rank": None})
+   716→            e["s_rank"] = rank
+   717→        for e in chunks.values():
+   718→            e["rrf"] = _rrf(e["v_rank"]) + _rrf(e["f_rank"]) + _rrf(e["s_rank"])
+   719→
+   720→        seen_sig = set()
+   721→        rows = []
+   722→        for e in sorted(chunks.values(), key=lambda e: e["rrf"], reverse=True):
+   723→            sig = (e["filename"], (e["chunk_text"] or "")[:80])
+   724→            if sig in seen_sig:
+   725→                continue  # identical content from duplicate uploads
+   726→            seen_sig.add(sig)
+   727→            rows.append(e)
+   728→            if len(rows) >= k:
+   729→                break
+   730→
+   731→        # 3b. Visual grounding — OCR text, detected objects, and (gated) visual
+   732→        #     semantics with smart-search relevance parity; never blocks an answer
+   733→        visual_hits, visual_intent = await _chat_visual_evidence(
+   734→            retrieval_query, target_ids, has_text_rows=bool(rows), user=current_user)
+   735→
+   736→        async def _no_match_response():
+   737→            lc_params: dict = {}
+   738→            lc_perm = permission_clause(current_user, lc_params, "documents")
+   739→            lib_count = (await db.execute(sql_text(
+   740→                f"SELECT COUNT(*) FROM documents WHERE {lc_perm}"), lc_params)).scalar() or 0
+   741→            if lib_count == 0:
+   742→                msg = ("لم أجد أي مستندات في المكتبة بعد. ارفع ملفًا أولًا ثم اسألني عنه."
+   743→                       if lang == "ar" else
+   744→                       "I couldn't find any documents in the library yet. Please upload a file first, then ask me about it.")
+   745→            else:
+   746→                msg = ("لم أعثر على محتوى مطابق لسؤالك في المستندات. جرّب إعادة الصياغة أو اسأل عن ملف محدد."
+   747→                       if lang == "ar" else
+   748→                       "I couldn't find content matching that question in your documents. Try rephrasing, or ask about a specific file.")
+   749→            return {"answer": msg, "question": req.question, "sources": []}
+   750→
+   751→        if not rows and not visual_hits:
+   752→            return await _no_match_response()
+   753→
+   754→        # Step 16.8 (R4): a non-visual question with zero text evidence and only
+   755→        # semantic-guess visual hits must not fabricate a source from a vague
+   756→        # visual resemblance ("What is the capital of France?" -> warehouse photo).
+   757→        if (not rows and not visual_intent
+   758→                and not any(v.get("exact") for v in visual_hits)):
+   759→            return await _no_match_response()
+   760→
+   761→        # Step 16.8 (V-class): listing questions — "which picture/files show X?" —
+   762→        # get a deterministic, enumerated, type-accurate answer built directly
+   763→        # from visual evidence. No LLM hedging, no apology, citations always
+   764→        # match the sources strip one-to-one.
+   765→        if visual_hits and _is_visual_listing(q_lower):
+   766→            def _vts(sec):
+   767→                sec = float(sec or 0)
+   768→                return f"{int(sec // 60)}:{int(sec % 60):02d}"
+   769→
+   770→            list_docs: list[dict] = []
+   771→            _seen_ld: set[int] = set()
+   772→            for v in visual_hits:
+   773→                if v["document_id"] not in _seen_ld:
+   774→                    _seen_ld.add(v["document_id"])
+   775→                    list_docs.append(v)
+   776→            if lang == "ar":
+   777→                lines = [f"وجدت {len(list_docs)} ملفًا يطابق سؤالك بصريًا:"]
+   778→            else:
+   779→                lines = [f"I found {len(list_docs)} file{'s' if len(list_docs) != 1 else ''} "
+   780→                         f"that visually match your question:"]
+   781→            sources = []
+   782→            for i, v in enumerate(list_docs, start=1):
+   783→                atype = (v.get("asset_type") or "image").lower()
+   784→                if atype == "video_frame":
+   785→                    kind = "فيديو" if lang == "ar" else "video"
+   786→                    loc = ((f"، لقطة عند {_vts(v['start_time'])}" if lang == "ar"
+   787→                            else f", frame at {_vts(v['start_time'])}")
+   788→                           if v.get("start_time") is not None else "")
+   789→                elif atype == "pdf_page":
+   790→                    kind = "صفحة PDF" if lang == "ar" else "PDF page"
+   791→                    loc = ((f"، صفحة {v['page_number']}" if lang == "ar"
+   792→                            else f", page {v['page_number']}")
+   793→                           if v.get("page_number") else "")
+   794→                else:
+   795→                    kind = "صورة" if lang == "ar" else "image"
+   796→                    loc = ""
+   797→                lines.append(f"[{i}] {v['filename']} ({kind}{loc})")
+   798→
+   799→                src_doc = {"document_id": v["document_id"], "filename": v["filename"],
+   800→                           "score": round(float(v.get("score") or 0), 3),
+   801→                           "pages": [], "start_time": None}
+   802→                for h in visual_hits:
+   803→                    if h["document_id"] != v["document_id"]:
+   804→                        continue
+   805→                    src_doc.setdefault("visuals", []).append({
+   806→                        "asset_id": h["asset_id"],
+   807→                        "asset_type": h.get("asset_type"),
+   808→                        "page_number": h.get("page_number"),
+   809→                        "start_time": h.get("start_time"),
+   810→                        "labels": h.get("labels") or [],
+   811→                        "score": round(float(h.get("score") or 0), 3),
+   812→                    })
+   813→                    if (h.get("page_number") is not None
+   814→                            and h["page_number"] not in src_doc["pages"]
+   815→                            and len(src_doc["pages"]) < 3):
+   816→                        src_doc["pages"].append(int(h["page_number"]))
+   817→                    if h.get("start_time") is not None and src_doc.get("start_time") is None:
+   818→                        src_doc["start_time"] = round(float(h["start_time"]), 1)
+   819→                sources.append(src_doc)
+   820→
+   821→            pii_map = await get_document_pii_map(db, [s["document_id"] for s in sources])
+   822→            for source in sources:
+   823→                source["pii"] = pii_for_document(pii_map, source["document_id"])
+   824→            pii_notice = build_pii_notice(pii_map, [s["document_id"] for s in sources])
+   825→            await audit_event(
+   826→                db, None, current_user.id, "CHAT_VISUAL_LISTING",
+   827→                f"{current_user.username} visual listing: {len(list_docs)} document(s) matched",
+   828→            )
+   829→            return {"answer": "\n".join(lines), "question": req.question,
+   830→                    "sources": sources, "pii_notice": pii_notice}
+   831→
+   832→        # 4. Ground the answer in the fused top-K hits (page / timestamp labeled)
+   833→        def _ts_label(sec):
+   834→            sec = float(sec or 0)
+   835→            return f"{int(sec // 60)}:{int(sec % 60):02d}"
+   836→
+   837→        # Citation relevance (Step 16.3): the LLM context keeps broad recall, but
+   838→        # displayed citations need strong evidence — a document qualifies only if
+   839→        # its best chunk similarity sits within SOURCE_REL_DROP of the top hit
+   840→        # (Step 14.4-style relative band). No vector evidence -> top fused rows.
+   841→        sims = [float(r["similarity"]) for r in rows if r.get("similarity") is not None]
+   842→        if sims:
+   843→            band = max(SIM_FLOOR, max(sims) - SOURCE_REL_DROP)
+   844→            cited = [r for r in rows
+   845→                     if r.get("similarity") is not None and float(r["similarity"]) >= band]
+   846→        else:
+   847→            cited = rows[:3]  # keyword-only mode (embedding unavailable)
+   848→        if not cited:
+   849→            cited = rows[:1]
+   850→
+   851→        # Citation numbering (Step 16.4): context documents are numbered exactly
+   852→        # like the displayed sources so the LLM can cite inline as [1], [2] and the
+   853→        # frontend can map each marker to its source (same dedupe rules, same order).
+   854→        cite_order: dict[int, int] = {}
+   855→        _seen_fn_num: set = set()
+   856→        for r in cited:
+   857→            if r["filename"] in _seen_fn_num:
+   858→                continue
+   859→            if r["document_id"] not in cite_order:
+   860→                cite_order[r["document_id"]] = len(cite_order) + 1
+   861→                _seen_fn_num.add(r["filename"])
+   862→        for v in visual_hits:
+   863→            if v["document_id"] not in cite_order and v["filename"] not in _seen_fn_num:
+   864→                cite_order[v["document_id"]] = len(cite_order) + 1
+   865→                _seen_fn_num.add(v["filename"])
+   866→
+   867→        def _ctx_line(r):
+   868→            if r["page_number"]:
+   869→                loc = f" p.{r['page_number']}"
+   870→            elif r["start_time"] is not None:
+   871→                loc = f" @ {_ts_label(r['start_time'])}"
+   872→            else:
+   873→                loc = ""
+   874→            n = cite_order.get(r["document_id"])
+   875→            tag = f"[Doc {n}: " if n else "[Document: "
+   876→            return f"{tag}{r['filename']}{loc}]\n{r['chunk_text']}"
+   877→
+   878→        def _visual_ctx_line(v):
+   879→            # Type-accurate tags (Step 16.6): the LLM must know whether a visual
+   880→            # hit is an image, a video moment, or a PDF page — otherwise it calls
+   881→            # video frames "pictures" in the answer.
+   882→            atype = (v.get("asset_type") or "image").lower()
+   883→            if atype == "video_frame":
+   884→                kind = "video"
+   885→                loc = f" @ {_ts_label(v['start_time'])}" if v.get("start_time") is not None else ""
+   886→                text_label = "Text in frame"
+   887→            elif atype == "pdf_page":
+   888→                kind = "PDF page"
+   889→                loc = f" p.{v['page_number']}" if v.get("page_number") else ""
+   890→                text_label = "Text on page"
+   891→            else:
+   892→                kind = "image"
+   893→                loc = ""
+   894→                text_label = "Text in image"
+   895→            labels = ", ".join(v.get("labels") or [])
+   896→            n = cite_order.get(v["document_id"])
+   897→            tag = f"[Doc {n} ({kind}): " if n else f"[{kind.capitalize()}: "
+   898→            header = f"{tag}{v['filename']}{loc}" + (f" | objects: {labels}" if labels else "") + "]"
+   899→            ocr = " ".join((v.get("ocr_text") or "").split())[:400]
+   900→            return header + (f"\n{text_label}: {ocr}" if ocr else "")
+   901→
+   902→        context = "\n\n---\n\n".join(
+   903→            [_ctx_line(r) for r in rows] + [_visual_ctx_line(v) for v in visual_hits]
+   904→        )
+   905→        if cite_order:
+   906→            if lang == "ar":
+   907→                question_for_llm = question + (
+   908→                    "\n\nعند استخدامك معلومات من مستند مرقّم، اذكر المصدر داخل الإجابة "
+   909→                    "بالشكل [1] أو [2] مطابقًا لرقم المستند — أرقامًا فقط، "
+   910→                    "مثال: «...كما ورد في السياسة [1].»"
+   911→                )
+   912→            else:
+   913→                question_for_llm = question + (
+   914→                    "\n\nWhen you use information from a numbered document, cite it inline "
+   915→                    "as [1], [2], etc. matching the document number — numbers only, "
+   916→                    "e.g. '...as stated in the policy [1].'"
+   917→                )
+   918→        else:
+   919→            question_for_llm = question
+   920→        if history:
+   921→            hist_label = "\u0627\u0644\u0645\u062d\u0627\u062f\u062b\u0629 \u062d\u062a\u0649 \u0627\u0644\u0622\u0646" if lang == "ar" else "Conversation so far"
+   922→            question_for_llm = (
+   923→                f"{hist_label}:\n" + _format_history(history) +
+   924→                "\n\n" + question_for_llm
+   925→            )
+   926→        answer = await llm_gateway.answer_question(question_for_llm, context, lang)
+   927→
+   928→        # Step 16.8: despite the "numbers only" instruction the LLM sometimes
+   929→        # writes "[Doc 1: file.pdf]" — normalize to bare [1] markers so the
+   930→        # answer-verified filter and the frontend linkifier both work.
+   931→        answer = re.sub(r"\[\s*Doc(?:ument)?\s+(\d{1,2})[^\]]*\]", r"[\1]", answer)
+   932→
+   933→
+   934→        # 5. Citations: pages of the chunks that grounded the answer (relevance order)
+   935→        seen, seen_fn, sources = set(), set(), []
+   936→        for r in cited:
+   937→            if r["filename"] in seen_fn:
+   938→                continue
+   939→            if r["document_id"] not in seen:
+   940→                seen.add(r["document_id"])
+   941→                seen_fn.add(r["filename"])
+   942→                sc = r["similarity"] if r["similarity"] is not None else round(r["rrf"], 3)
+   943→                sources.append({"document_id": r["document_id"], "filename": r["filename"],
+   944→                                "score": round(float(sc), 3),
+   945→                                "pages": [], "start_time": None})
+   946→        for r in cited:
+   947→            src_doc = next((s for s in sources if s["document_id"] == r["document_id"]), None)
+   948→            if src_doc is None:
+   949→                continue  # duplicate-upload doc collapsed by filename dedupe
+   950→            if r["page_number"] is not None:
+   951→                if r["page_number"] not in src_doc["pages"] and len(src_doc["pages"]) < 3:
+   952→                    src_doc["pages"].append(int(r["page_number"]))
+   953→            if r["start_time"] is not None and src_doc["start_time"] is None:
+   954→                src_doc["start_time"] = r["start_time"]
+   955→
+   956→        # A/V citations: best-matching segment timestamp per source (for seek chips)
+   957→        if emb_str and seen:
+   958→            try:
+   959→                seg_rows = (await db.execute(sql_text("""
+   960→                    SELECT DISTINCT ON (s.document_id) s.document_id, s.start_time
+   961→                    FROM document_segments s
+   962→                    WHERE s.document_id = ANY(CAST(:doc_ids AS int[]))
+   963→                    ORDER BY s.document_id, s.embedding <=> CAST(:emb AS vector)
+   964→                """), {"doc_ids": list(seen), "emb": emb_str})).fetchall()
+   965→                seg_map = {r.document_id: round(float(r.start_time or 0), 1) for r in seg_rows}
+   966→                for s in sources:
+   967→                    if s["document_id"] in seg_map:
+   968→                        s["start_time"] = seg_map[s["document_id"]]
+   969→            except Exception:
+   970→                pass  # no segments table rows; page/doc citations still work
+   971→
+   972→        # Visual citations: thumbnail chips grouped under their source document
+   973→        # (visual-only documents become sources in their own right)
+   974→        for v in visual_hits:
+   975→            src_doc = next((s for s in sources if s["document_id"] == v["document_id"]), None)
+   976→            if src_doc is None:
+   977→                src_doc = {"document_id": v["document_id"], "filename": v["filename"],
+   978→                           "score": round(float(v.get("score") or 0), 3),
+   979→                           "pages": [], "start_time": None}
+   980→                sources.append(src_doc)
+   981→            src_doc.setdefault("visuals", []).append({
+   982→                "asset_id": v["asset_id"],
+   983→                "asset_type": v.get("asset_type"),
+   984→                "page_number": v.get("page_number"),
+   985→                "start_time": v.get("start_time"),
+   986→                "labels": v.get("labels") or [],
+   987→                "score": round(float(v.get("score") or 0), 3),
+   988→            })
+   989→            if v.get("page_number") is not None and v["page_number"] not in src_doc["pages"] and len(src_doc["pages"]) < 3:
+   990→                src_doc["pages"].append(int(v["page_number"]))
+   991→            if v.get("start_time") is not None and src_doc.get("start_time") is None:
+   992→                src_doc["start_time"] = round(float(v["start_time"]), 1)
+   993→
+   994→        # Answer-verified citations (Step 16.5): display only the sources the
+   995→        # answer actually references — by [n] marker or by filename — so the
+   996→        # sources strip matches what the answer cites. Markers are renumbered
+   997→        # to the filtered order. Generic answers (no reference) keep the full
+   998→        # evidence-based list, so citations never disappear.
+   999→        if sources:
+  1000→            referenced: set[int] = set()
+  1001→            for num in re.findall(r"\[(\d{1,2})\]", answer):
+  1002→                idx = int(num) - 1
+  1003→                if 0 <= idx < len(sources):
+  1004→                    referenced.add(sources[idx]["document_id"])
+  1005→            answer_lower = answer.lower()
+  1006→            for s in sources:
+  1007→                if s["filename"].lower() in answer_lower:
+  1008→                    referenced.add(s["document_id"])
+  1009→            if referenced:
+  1010→                old_sources = sources
+  1011→                sources = [s for s in old_sources if s["document_id"] in referenced]
+  1012→                new_index = {s["document_id"]: i + 1 for i, s in enumerate(sources)}
+  1013→
+  1014→                def _renum(m):
+  1015→                    n = int(m.group(1))
+  1016→                    if 1 <= n <= len(old_sources):
+  1017→                        doc_id = old_sources[n - 1]["document_id"]
+  1018→                        if doc_id in new_index:
+  1019→                            return f"[{new_index[doc_id]}]"
+  1020→                    return ""  # marker points to a dropped source -> remove it
+  1021→
+  1022→                answer = re.sub(r"\[(\d{1,2})\]", _renum, answer)
+  1023→
+  1024→        # Step 16.8 (R4 companion): a bare "I don't have enough information"
+  1025→        # answer cites nothing — the sources strip must be empty too.
+  1026→        if sources and not re.search(r"\[(\d{1,2})\]", answer) and _NO_INFO_RE.match(answer.strip()):
+  1027→            sources = []
+  1028→
+  1029→        pii_map = await get_document_pii_map(db, [s["document_id"] for s in sources])
+  1030→        for source in sources:
+  1031→            source["pii"] = pii_for_document(pii_map, source["document_id"])
+  1032→        pii_notice = build_pii_notice(pii_map, [s["document_id"] for s in sources])
+  1033→        if pii_notice["flagged_documents"]:
+  1034→            await audit_event(
+  1035→                db,
+  1036→                None,
+  1037→                current_user.id,
+  1038→                "CONTENT_PII_FLAGGED_RESULT",
+  1039→                f"Chat returned {pii_notice['flagged_documents']} PII-flagged document(s)",
+  1040→            )
+  1041→        return {"answer": answer, "question": req.question, "sources": sources, "pii_notice": pii_notice, "language": lang}
+  1042→    except Exception as e:
+  1043→        return {
+  1044→            "answer": f"⚠️ AI service unavailable: {str(e)}\n\nYour documents are still searchable. Try using the Search tab instead.",
+  1045→            "question": req.question,
+  1046→            "error": True
+  1047→        }
+  1048→
+  1049→
+  1050→# ---- Step 30: voice (STT questions + neural TTS answers) -------------------
+  1051→TTS_VOICES = {"ar": "ar-SA-HamedNeural", "en": "en-US-JennyNeural",
+  1052→              "ur": "ur-PK-UzmaNeural", "hi": "hi-IN-SwaraNeural"}
+  1053→TTS_MAX_CHARS = 1500
+  1054→VOICE_MAX_BYTES = 15 * 1024 * 1024
+  1055→
+  1056→
+  1057→@router.post("/voice")
+  1058→async def chat_voice(
+  1059→    audio: UploadFile = File(...),
+  1060→    history: str = Form("[]"),
+  1061→    language: str = Form(""),  # Step 30F: mic selector override ("" = auto)
+  1062→    current_user: User = Depends(require_content_user()),
+  1063→    db: AsyncSession = Depends(get_db),
+  1064→):
+  1065→    """Mic questions: audio -> whisper STT (AR/EN auto) -> normal chat pipeline."""
+  1066→    from app.services.stt_service import transcribe_audio_with_language
+  1067→
+  1068→    media = await audio.read()
+  1069→    if not media:
+  1070→        raise HTTPException(status_code=400, detail="Empty audio")
+  1071→    if len(media) > VOICE_MAX_BYTES:
+  1072→        raise HTTPException(status_code=413, detail="Audio too large")
+  1073→    try:
+  1074→        forced = (language or "").strip().lower()[:2]
+  1075→        if forced not in ("ar", "en", "ur"):
+  1076→            forced = ""
+  1077→        transcript, stt_lang = await asyncio.to_thread(
+  1078→            transcribe_audio_with_language, media, audio.filename or "voice.webm",
+  1079→            forced or None)
+  1080→    except Exception as exc:
+  1081→        raise HTTPException(status_code=503, detail=f"Speech recognition unavailable: {exc}")
+  1082→    transcript = unicodedata.normalize("NFKC", (transcript or "").strip())
+  1083→    if not transcript:
+  1084→        return {"answer": "", "question": "", "transcript": "", "sources": []}
+  1085→    try:
+  1086→        hist = json.loads(history) if history else []
+  1087→        if not isinstance(hist, list):
+  1088→            hist = []
+  1089→    except Exception:
+  1090→        hist = []
+  1091→    req = ChatRequest(question=transcript, history=hist[-HISTORY_TURNS:], language=stt_lang)
+  1092→    resp = await chat(req, current_user, db)
+  1093→    resp["transcript"] = transcript
+  1094→    if not resp.get("language"):
+  1095→        resp["language"] = stt_lang or detect_language(transcript)
+  1096→    return resp
+  1097→
+  1098→
+  1099→@router.post("/tts")
+  1100→async def chat_tts(req: TtsRequest, current_user: User = Depends(require_content_user())):
+  1101→    """Neural spoken answers (edge-tts). Context is PII-masked before synthesis.
+  1102→    503 -> the client falls back to browser speech."""
+  1103→    from fastapi.responses import StreamingResponse
+  1104→    from app.services.pii_detection import redact_pii
+  1105→    try:
+  1106→        import edge_tts
+  1107→    except ImportError:
+  1108→        raise HTTPException(status_code=503, detail="Neural TTS not installed")
+  1109→
+  1110→    text = unicodedata.normalize("NFKC", (req.text or "").strip())
+  1111→    text = re.sub(r"\[\d{1,2}\]", " ", text)  # drop bare [1] citation markers
+  1112→    if not text:
+  1113→        raise HTTPException(status_code=400, detail="Empty text")
+  1114→    text, _ = redact_pii(text)
+  1115→    text = text[:TTS_MAX_CHARS]
+  1116→    lang = req.language if req.language in TTS_VOICES else detect_language(text)
+  1117→    voice = TTS_VOICES[lang]
+  1118→
+  1119→    communicate = edge_tts.Communicate(text, voice)
+  1120→
+  1121→    async def audio_stream():
+  1122→        async for chunk in communicate.stream():
+  1123→            if chunk.get("type") == "audio":
+  1124→                yield chunk["data"]
+  1125→
+  1126→    return StreamingResponse(audio_stream(), media_type="audio/mpeg")
+  1127→
+  1128→
+  1129→# ---- Step 32: multimodal chat (image-grounded Q&A) -------------------------
+  1130→VISION_MAX_BYTES = 8 * 1024 * 1024
+  1131→VISION_FETCH = 8
+  1132→
+  1133→
+  1134→async def _vision_similar_assets(embedding: list[float], user) -> list[dict]:
+  1135→    """Image embedding -> nearest visual assets. Same SQL contract as
+  1136→    _visual_vector_leg (permission-scoped, completed docs, sim floor)."""
+  1137→    params: dict = {"emb": str(embedding), "fetch": VISION_FETCH}
+  1138→    scope = " AND (" + permission_clause(user, params, "d") + ")"
+  1139→    async with async_session() as session:
+  1140→        rows = (await session.execute(sql_text("""
+  1141→            SELECT va.id AS asset_id, va.document_id, va.asset_type, va.page_number,
+  1142→                   va.start_time, va.end_time, va.ocr_text,
+  1143→                   1 - (va.embedding <=> CAST(:emb AS vector)) AS score,
+  1144→                   d.filename
+  1145→            FROM visual_assets va
+  1146→            JOIN documents d ON d.id = va.document_id
+  1147→            WHERE COALESCE(d.status, 'completed') = 'completed'
+  1148→              AND va.embedding IS NOT NULL""" + scope + """
+  1149→            ORDER BY va.embedding <=> CAST(:emb AS vector)
+  1150→            LIMIT :fetch
+  1151→        """), params)).mappings().all()
+  1152→    hits = [dict(r) for r in rows if float(r["score"] or 0) >= VISUAL_SIM_FLOOR]
+  1153→    if hits:  # Step 32B: attach detected labels (same contract as visual.py)
+  1154→        async with async_session() as session:
+  1155→            label_rows = (await session.execute(sql_text("""
+  1156→                SELECT asset_id, label, confidence
+  1157→                FROM visual_labels
+  1158→                WHERE asset_id = ANY(CAST(:asset_ids AS int[]))
+  1159→                ORDER BY asset_id, confidence DESC
+  1160→            """), {"asset_ids": [int(h["asset_id"]) for h in hits]})).mappings().all()
+  1161→        label_map: dict[int, list[str]] = {}
+  1162→        for row in label_rows:
+  1163→            labels = label_map.setdefault(int(row["asset_id"]), [])
+  1164→            if len(labels) < 8 and row["label"] not in labels:
+  1165→                labels.append(row["label"])
+  1166→        for h in hits:
+  1167→            h["labels"] = label_map.get(int(h["asset_id"]), [])
+  1168→    return hits
+  1169→
+  1170→
+  1171→@router.post("/vision")
+  1172→async def chat_vision(
+  1173→    image: UploadFile = File(...),
+  1174→    question: str = Form(""),
+  1175→    history: str = Form("[]"),
+  1176→    language: str = Form(""),
+  1177→    current_user: User = Depends(require_content_user()),
+  1178→    db: AsyncSession = Depends(get_db),
+  1179→):
+  1180→    """Attach an image, ask about it. The image is embedded with the same
+  1181→    visual model used at ingest, matched against visual_assets, and the
+  1182→    answer is grounded in the matched pages / video frames / images."""
+  1183→    import io as _io
+  1184→    from PIL import Image as _PILImage
+  1185→    from app.services.visual_ai import embed_visual_image
+  1186→
+  1187→    data = await image.read()
+  1188→    if not data:
+  1189→        raise HTTPException(status_code=400, detail="Empty image")
+  1190→    if len(data) > VISION_MAX_BYTES:
+  1191→        raise HTTPException(status_code=413, detail="Image too large (max 8 MB)")
+  1192→    try:
+  1193→        pil = _PILImage.open(_io.BytesIO(data)).convert("RGB")
+  1194→    except Exception:
+  1195→        raise HTTPException(status_code=400, detail="Unsupported image")
+  1196→    try:
+  1197→        embedding = await asyncio.to_thread(embed_visual_image, pil)
+  1198→    except Exception as exc:
+  1199→        raise HTTPException(status_code=503, detail=f"Visual model unavailable: {exc}")
+  1200→
+  1201→    q = unicodedata.normalize("NFKC", (question or "").strip())
+  1202→    lang = (language or "").strip().lower()[:2]
+  1203→    if lang not in SUPPORTED_LANGS:
+  1204→        lang = detect_language(q) if q else "en"
+  1205→    default_q = {
+  1206→        "ar": "\u0645\u0627\u0630\u0627 \u064a\u0648\u062c\u062f \u0641\u064a \u0647\u0630\u0647 \u0627\u0644\u0635\u0648\u0631\u0629\u061f \u0635\u0641\u0647\u0627 \u0648\u0627\u0628\u062d\u062b \u0639\u0646 \u0627\u0644\u0645\u0633\u062a\u0646\u062f\u0627\u062a \u0627\u0644\u0645\u0631\u062a\u0628\u0637\u0629 \u0628\u0647\u0627.",
+  1207→        "ur": "\u0627\u0633 \u062a\u0635\u0648\u06cc\u0631 \u0645\u06cc\u06ba \u06a9\u06cc\u0627 \u06c1\u06d2\u061f \u0627\u0633\u06d2 \u0628\u06cc\u0627\u0646 \u06a9\u0631\u06cc\u06ba \u0627\u0648\u0631 \u0645\u062a\u0639\u0644\u0642\u06c1 \u062f\u0633\u062a\u0627\u0648\u06cc\u0632\u0627\u062a \u062a\u0644\u0627\u0634 \u06a9\u0631\u06cc\u06ba\u06d4",
+  1208→        "en": "What is in this image? Describe it and find related documents.",
+  1209→    }
+  1210→    if not q:
+  1211→        q = default_q.get(lang, default_q["en"])
+  1212→
+  1213→    hits = await _vision_similar_assets(embedding, current_user)
+  1214→    if not hits:
+  1215→        msg = {
+  1216→            "ar": "\u0644\u0645 \u0623\u062c\u062f \u0641\u064a \u0627\u0644\u0645\u0643\u062a\u0628\u0629 \u0635\u0648\u0631\u064b\u0627 \u0623\u0648 \u0635\u0641\u062d\u0627\u062a \u0645\u0634\u0627\u0628\u0647\u0629 \u0644\u0647\u0630\u0647 \u0627\u0644\u0635\u0648\u0631\u0629.",
+  1217→            "ur": "\u0644\u0627\u0626\u0628\u0631\u06cc\u0631\u06cc \u0645\u06cc\u06ba \u0627\u0633 \u062a\u0635\u0648\u06cc\u0631 \u0633\u06d2 \u0645\u0644\u062a\u06cc \u062c\u0644\u062a\u06cc \u06a9\u0648\u0626\u06cc \u062a\u0635\u0648\u06cc\u0631 \u06cc\u0627 \u0635\u0641\u062d\u06c1 \u0646\u06c1\u06cc\u06ba \u0645\u0644\u0627\u06d4",
+  1218→            "en": "I couldn't find any visually similar pages or images in the library for this image.",
+  1219→        }
+  1220→        return {"answer": msg.get(lang, msg["en"]), "question": q, "sources": [], "language": lang}
+  1221→
+  1222→    # Group per document FIRST so [n] markers align with sources[n-1]
+  1223→    sources: list[dict] = []
+  1224→    for h in hits:
+  1225→        doc_id = int(h["document_id"])
+  1226→        src = next((s for s in sources if s["document_id"] == doc_id), None)
+  1227→        if src is None:
+  1228→            src = {"document_id": doc_id, "filename": h["filename"],
+  1229→                   "score": round(float(h["score"]), 3), "pages": [], "start_time": None}
+  1230→            sources.append(src)
+  1231→        src["score"] = max(src["score"], round(float(h["score"]), 3))
+  1232→        src.setdefault("visuals", []).append({
+  1233→            "asset_id": h["asset_id"], "asset_type": h.get("asset_type"),
+  1234→            "page_number": h.get("page_number"), "start_time": h.get("start_time"),
+  1235→            "labels": h.get("labels") or [], "score": round(float(h["score"]), 3)})
+  1236→        if h.get("page_number") is not None and h["page_number"] not in src["pages"] and len(src["pages"]) < 3:
+  1237→            src["pages"].append(int(h["page_number"]))
+  1238→        if h.get("start_time") is not None and src.get("start_time") is None:
+  1239→            src["start_time"] = round(float(h["start_time"]), 1)
+  1240→
+  1241→    cite_no = {s["document_id"]: i + 1 for i, s in enumerate(sources)}
+  1242→    ctx_lines = []
+  1243→    for h in hits:
+  1244→        atype = (h.get("asset_type") or "image").lower()
+  1245→        if atype == "video_frame":
+  1246→            sec = float(h.get("start_time") or 0)
+  1247→            loc = f" at {int(sec // 60)}:{int(sec % 60):02d}" if h.get("start_time") is not None else ""
+  1248→            kind = "video frame"
+  1249→        elif atype == "pdf_page":
+  1250→            kind, loc = "PDF page", f" page {h.get('page_number')}" if h.get("page_number") else ""
+  1251→        else:
+  1252→            kind, loc = "image", ""
+  1253→        ocr = (h.get("ocr_text") or "").strip()[:300]
+  1254→        doc_id = int(h["document_id"])
+  1255→        line = f"[{cite_no[doc_id]}] {h['filename']} ({kind}{loc}, similarity {float(h['score']):.2f})"
+  1256→        if ocr:
+  1257→            line += f"\nText on it: {ocr}"
+  1258→        labels = h.get("labels") or []
+  1259→        if labels:
+  1260→            line += f"\nDetected: {', '.join(labels)}"
+  1261→        ctx_lines.append(line)
+  1262→    context = "\n".join(ctx_lines)
+  1263→
+  1264→    question_for_llm = q
+  1265→    try:
+  1266→        hist = json.loads(history) if history else []
+  1267→        if isinstance(hist, list) and hist:
+  1268→            question_for_llm = _format_history(hist) + "\n\n" + q
+  1269→    except Exception:
+  1270→        pass
+  1271→    # Step 32B: vision-specific prompt (generic prompt caused weak answers).
+  1272→    # redact_pii keeps the Step 29 masking guarantee (answer_question did it
+  1273→    # internally; _generate does not, so we mask explicitly here).
+  1274→    from app.services.pii_detection import redact_pii
+  1275→    context, _pii_n = redact_pii(context)
+  1276→    lang_name = LANG_NAMES.get(lang, "English")
+  1277→    prompt = (
+  1278→        "You are Seekra's visual document assistant. The user uploaded an image and "
+  1279→        "the system found the visually closest items in the document library, listed "
+  1280→        "below with similarity scores (0.0-1.0, higher means closer), detected content "
+  1281→        "labels, and any text recognized on them.\n\n"
+  1282→        "Based on these matches, describe what the user's image most likely shows and "
+  1283→        "which document(s) it relates to. Cite the documents you rely on with [n] "
+  1284→        "markers matching the numbers below. If the matches seem unrelated to the "
+  1285→        "question, say so honestly. Answer ONLY in " + lang_name + ".\n\n"
+  1286→        "Matched items:\n" + context + "\n\nUser question: " + question_for_llm
+  1287→    )
+  1288→    answer = await llm_gateway._generate(prompt, max_tokens=500, kind="chat")
+  1289→    answer = re.sub(r"\[\s*Doc(?:ument)?\s+(\d{1,2})[^\]]*\]", r"[\1]", answer)
+  1290→    return {"answer": answer, "question": q, "sources": sources, "language": lang}
+  1291→
+  1292→
+  1293→@router.get("/debug-legs")
+  1294→async def debug_legs(q: str = "", current_user: User = Depends(require_content_user()), db: AsyncSession = Depends(get_db)):
+  1295→    """Diagnostics: run the chat retrieval legs for a question, expose raw rankings."""
+  1296→    question = unicodedata.normalize("NFKC", (q or "").strip())
+  1297→    if not question:
+  1298→        return {"error": "empty question"}
+  1299→    try:
+  1300→        q_emb = await asyncio.to_thread(get_embedding, question)
+  1301→        emb_str = "[" + ",".join(f"{x:.6f}" for x in q_emb) + "]"
+  1302→    except Exception:
+  1303→        emb_str = None
+  1304→    out = {"question": question, "resolved_target_ids": await resolve_target_documents(question, db, current_user),
+  1305→           "vector_chunks": [], "fts_chunks": [], "vector_segments": []}
+  1306→    if emb_str:
+  1307→        vr = (await db.execute(sql_text("""
+  1308→            SELECT c.document_id, d.filename, c.page_number,
+  1309→                   1 - (c.embedding <=> CAST(:emb AS vector)) AS sim
+  1310→            FROM document_chunks c JOIN documents d ON d.id = c.document_id
+  1311→            WHERE c.embedding IS NOT NULL
+  1312→            ORDER BY c.embedding <=> CAST(:emb AS vector) LIMIT 15
+  1313→        """), {"emb": emb_str})).mappings().all()
+  1314→        out["vector_chunks"] = [{"doc": r["document_id"], "filename": r["filename"],
+  1315→                                 "page": r["page_number"], "sim": round(float(r["sim"]), 4)} for r in vr]
+  1316→        sr = (await db.execute(sql_text("""
+  1317→            SELECT s.document_id, d.filename, s.start_time,
+  1318→                   1 - (s.embedding <=> CAST(:emb AS vector)) AS sim
+  1319→            FROM document_segments s JOIN documents d ON d.id = s.document_id
+  1320→            WHERE s.embedding IS NOT NULL
+  1321→            ORDER BY s.embedding <=> CAST(:emb AS vector) LIMIT 15
+  1322→        """), {"emb": emb_str})).mappings().all()
+  1323→        out["vector_segments"] = [{"doc": r["document_id"], "filename": r["filename"],
+  1324→                                   "t": round(float(r["start_time"] or 0), 1),
+  1325→                                   "sim": round(float(r["sim"]), 4)} for r in sr]
+  1326→    fr = (await db.execute(sql_text("""
+  1327→        SELECT c.document_id, d.filename, c.page_number,
+  1328→               ts_rank_cd(c.search_vector, websearch_to_tsquery('english', :qtext)) AS kw
+  1329→        FROM document_chunks c JOIN documents d ON d.id = c.document_id
+  1330→        WHERE c.search_vector @@ websearch_to_tsquery('english', :qtext)
+  1331→        ORDER BY kw DESC LIMIT 15
+  1332→    """), {"qtext": question})).mappings().all()
+  1333→    out["fts_chunks"] = [{"doc": r["document_id"], "filename": r["filename"],
+  1334→                          "page": r["page_number"], "kw": round(float(r["kw"]), 4)} for r in fr]
+  1335→
+  1336→    # Visual legs (Step 16.1 diagnostics): object terms, OCR/object hits, and the
+  1337→    # semantic leg with a generous timeout so a cold model is observable here.
+  1338→    try:
+  1339→        known_dbg = await _known_visual_labels()
+  1340→        out["visual_known_labels"] = len(known_dbg)
+  1341→    except Exception as e:
+  1342→        known_dbg = set()
+  1343→        out["visual_known_labels_error"] = type(e).__name__
+  1344→    obj_terms_dbg = sorted(
+  1345→        {t for t in re.findall(r"\w+", question.lower()) if t not in STOPWORDS} & known_dbg)
+  1346→    out["visual_object_terms"] = obj_terms_dbg
+  1347→    try:
+  1348→        ocr_dbg = await _visual_ocr_leg(question, [], 5, user=current_user)
+  1349→        out["visual_ocr"] = [{"asset": r["asset_id"], "doc": r["document_id"], "filename": r["filename"],
+  1350→                              "score": round(float(r["score"]), 4)} for r in ocr_dbg[:5]]
+  1351→    except Exception as e:
+  1352→        out["visual_ocr_error"] = type(e).__name__
+  1353→    if obj_terms_dbg:
+  1354→        try:
+  1355→            obj_dbg = await _visual_object_leg(obj_terms_dbg, [], 5)
+  1356→            out["visual_object"] = [{"asset": r["asset_id"], "doc": r["document_id"], "filename": r["filename"],
+  1357→                                     "score": round(float(r["score"]), 4)} for r in obj_dbg[:5]]
+  1358→        except Exception as e:
+  1359→            out["visual_object_error"] = type(e).__name__
+  1360→    try:
+  1361→        vec_dbg = await asyncio.wait_for(_visual_vector_leg(question, [], 5), timeout=15.0)
+  1362→        out["visual_vector"] = [{"asset": r["asset_id"], "doc": r["document_id"], "filename": r["filename"],
+  1363→                                 "sim": round(float(r["score"]), 4)} for r in vec_dbg[:5]]
+  1364→    except Exception as e:
+  1365→        out["visual_vector_error"] = type(e).__name__
+  1366→    return out
+  1367→

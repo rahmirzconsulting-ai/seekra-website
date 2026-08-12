@@ -1,0 +1,915 @@
+     1→from __future__ import annotations
+     2→
+     3→import asyncio
+     4→import io
+     5→import re
+     6→from datetime import datetime
+     7→import time
+     8→import unicodedata
+     9→from typing import Any, Optional
+    10→
+    11→from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+    12→from PIL import Image
+    13→from pydantic import BaseModel, Field
+    14→from sqlalchemy import text
+    15→from sqlalchemy.ext.asyncio import AsyncSession
+    16→
+    17→from app.api.auth import require_content_user
+    18→from app.core.database import async_session, get_db
+    19→from app.models.user import User
+    20→from app.services.audit import audit_event
+    21→from app.services.embedding import get_embedding
+    22→from app.services.permissions import current_search_user, permission_clause
+    23→from app.services.pii_policy import get_document_pii_map, pii_for_document
+    24→from app.services.search_cache import cache_get_json, cache_set_json, stable_hash
+    25→from app.services.visual_ai import embed_visual_image, embed_visual_text
+    26→from app.services.visual_policy import get_document_visual_map, visual_for_document
+    27→
+    28→router = APIRouter(prefix="/api/smart-search", tags=["smart-search"])
+    29→
+    30→RRF_K = 60
+    31→FETCH_FACTOR = 4
+    32→DOC_SIM_FLOOR = 0.44
+    33→SEG_SIM_FLOOR = 0.50
+    34→VISUAL_SIM_FLOOR = 0.20
+    35→VISUAL_SEMANTIC_ONLY_FLOOR = 0.22
+    36→VISUAL_RELATIVE_DROP = 0.04
+    37→IMAGE_SIM_RELATIVE_DROP = 0.08
+    38→RESULT_CACHE_TTL = 180
+    39→EMBEDDING_CACHE_TTL = 24 * 60 * 60
+    40→LABEL_CACHE_TTL = 15 * 60
+    41→
+    42→_DOC_MODEL_LOCK = asyncio.Lock()
+    43→_VISUAL_MODEL_LOCK = asyncio.Lock()
+    44→
+    45→VISUAL_INTENT_TERMS = {
+    46→    "image", "images", "photo", "photos", "picture", "pictures", "screen",
+    47→    "video", "frame", "frames", "slide", "slides", "logo", "person",
+    48→    "people", "car", "vehicle", "machine", "machinery", "tv", "monitor",
+    49→    "document page", "scanned", "scan", "chart", "diagram",
+    50→}
+    51→
+    52→SEARCH_STOPWORDS = {
+    53→    "a", "an", "the", "and", "or", "of", "to", "in", "on", "at", "by",
+    54→    "for", "with", "from", "is", "are", "was", "were", "be", "been",
+    55→    "it", "this", "that", "these", "those",
+    56→}
+    57→
+    58→
+    59→class SmartSearchRequest(BaseModel):
+    60→    query: str = Field(min_length=1, max_length=500)
+    61→    limit: int = Field(default=20, ge=1, le=50)
+    62→    collection_id: Optional[int] = None
+    63→    document_ids: Optional[list[int]] = None
+    64→    # Step 17D — advanced filters (all optional; unset = no filtering)
+    65→    categories: Optional[list[str]] = None   # UI buckets, see _CATEGORY_MIME_MAP
+    66→    language: Optional[str] = None           # e.g. "en" / "ar"
+    67→    date_from: Optional[str] = None          # YYYY-MM-DD, inclusive
+    68→    date_to: Optional[str] = None            # YYYY-MM-DD, inclusive
+    69→    has_pii: Optional[bool] = None           # true = only PII-flagged docs
+    70→    has_visuals: Optional[bool] = None       # true = only docs with visual assets
+    71→
+    72→
+    73→# UI category buckets -> simplified mime kinds stored on documents.content_type
+    74→_CATEGORY_MIME_MAP = {
+    75→    "pdf": ["pdf"],
+    76→    "documents": ["document", "text"],
+    77→    "spreadsheets": ["spreadsheet"],
+    78→    "presentations": ["presentation"],
+    79→    "images": ["image"],
+    80→    "video": ["video"],
+    81→    "audio": ["audio"],
+    82→}
+    83→
+    84→_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+    85→
+    86→
+    87→def _category_for_mime(mime: str | None) -> str:
+    88→    token = (mime or "").strip().lower()
+    89→    for bucket, tokens in _CATEGORY_MIME_MAP.items():
+    90→        if token in tokens:
+    91→            return bucket
+    92→    return "other"
+    93→
+    94→
+    95→def _rrf(rank: int | None) -> float:
+    96→    return 0.0 if rank is None else 1.0 / (RRF_K + rank)
+    97→
+    98→
+    99→def _normalize_query(query: str) -> str:
+   100→    return " ".join(unicodedata.normalize("NFKC", (query or "").strip()).split())
+   101→
+   102→
+   103→def _terms(query: str, limit: int = 8) -> list[str]:
+   104→    words = re.findall(r"\w+", query.lower(), flags=re.UNICODE)
+   105→    return [word for word in words if word not in SEARCH_STOPWORDS][:limit]
+   106→
+   107→
+   108→def _is_arabic(query: str) -> bool:
+   109→    return bool(re.search(r"[\u0600-\u06FF]", query))
+   110→
+   111→
+   112→def _is_quoted(query: str) -> bool:
+   113→    return bool(re.search(r"[\"“”'][^\"“”']+[\"“”']", query))
+   114→
+   115→
+   116→def _filter_clause(req: SmartSearchRequest, params: dict, document_alias: str = "d") -> str:
+   117→    clauses = [f"COALESCE({document_alias}.status, 'completed') = 'completed'"]
+   118→    # 18A2 — collection permission enforcement (user set per-request by the endpoint)
+   119→    clauses.append(permission_clause(current_search_user.get(), params, document_alias))
+   120→    if req.collection_id is not None:
+   121→        clauses.append(f"{document_alias}.collection_id = :collection_id")
+   122→        params["collection_id"] = req.collection_id
+   123→    if req.document_ids:
+   124→        clauses.append(f"{document_alias}.id = ANY(CAST(:document_ids AS int[]))")
+   125→        params["document_ids"] = req.document_ids
+   126→    # --- Step 17D advanced filters ---
+   127→    if req.categories:
+   128→        mimes = sorted({
+   129→            mime for bucket in req.categories for mime in _CATEGORY_MIME_MAP.get(bucket, [])
+   130→        })
+   131→        if mimes:
+   132→            clauses.append(f"{document_alias}.content_type = ANY(CAST(:filter_mimes AS text[]))")
+   133→            params["filter_mimes"] = mimes
+   134→    if req.language:
+   135→        clauses.append(f"{document_alias}.language = :filter_language")
+   136→        params["filter_language"] = req.language
+   137→    if req.date_from and _DATE_RE.match(req.date_from):
+   138→        # Bind as datetime.date — asyncpg rejects str for date-typed params.
+   139→        clauses.append(f"{document_alias}.created_at >= :filter_date_from")
+   140→        params["filter_date_from"] = datetime.strptime(req.date_from, "%Y-%m-%d").date()
+   141→    if req.date_to and _DATE_RE.match(req.date_to):
+   142→        clauses.append(f"{document_alias}.created_at::date <= :filter_date_to")
+   143→        params["filter_date_to"] = datetime.strptime(req.date_to, "%Y-%m-%d").date()
+   144→    if req.has_pii:
+   145→        clauses.append(f"COALESCE({document_alias}.pii_flagged, false) = true")
+   146→    if req.has_visuals:
+   147→        clauses.append(
+   148→            f"EXISTS (SELECT 1 FROM visual_assets vaf WHERE vaf.document_id = {document_alias}.id)"
+   149→        )
+   150→    return " AND ".join(clauses)
+   151→
+   152→
+   153→def _elapsed_ms(start: float) -> int:
+   154→    return int((time.perf_counter() - start) * 1000)
+   155→
+   156→
+   157→async def _known_visual_labels(db: AsyncSession) -> set[str]:
+   158→    cache_key = "seekra:smart-search:visual-labels:v1"
+   159→    cached = await cache_get_json(cache_key)
+   160→    if isinstance(cached, list):
+   161→        return {str(label).lower() for label in cached}
+   162→    result = await db.execute(text("SELECT DISTINCT lower(label) AS label FROM visual_labels"))
+   163→    labels = [row.label for row in result.mappings() if row.label]
+   164→    await cache_set_json(cache_key, labels, LABEL_CACHE_TTL)
+   165→    return set(labels)
+   166→
+   167→
+   168→def _make_plan(query: str, known_labels: set[str]) -> dict:
+   169→    terms = _terms(query)
+   170→    term_set = set(terms)
+   171→    object_terms = sorted(term_set & known_labels)
+   172→    lower_query = query.lower()
+   173→    visual_keyword = any(term in lower_query for term in VISUAL_INTENT_TERMS)
+   174→    quoted = _is_quoted(query)
+   175→    descriptive = len(terms) >= 3 or len(query) >= 24
+   176→    visual_intent = bool(object_terms or visual_keyword)
+   177→
+   178→    stage_a = ["filename", "document_fts", "segment_fts", "visual_ocr"]
+   179→    if object_terms:
+   180→        stage_a.append("visual_object")
+   181→
+   182→    return {
+   183→        "terms": terms,
+   184→        "quoted": quoted,
+   185→        "arabic": _is_arabic(query),
+   186→        "descriptive": descriptive,
+   187→        "visual_intent": visual_intent,
+   188→        "object_terms": object_terms,
+   189→        "stage_a": stage_a,
+   190→    }
+   191→
+   192→
+   193→async def _run_timed_tasks(tasks: dict[str, Any], timeout_seconds: float) -> tuple[dict[str, list[dict]], dict[str, dict]]:
+   194→    async def run_one(name: str, coro):
+   195→        start = time.perf_counter()
+   196→        try:
+   197→            rows = await asyncio.wait_for(coro, timeout=timeout_seconds)
+   198→            return name, rows or [], {"status": "ok", "ms": _elapsed_ms(start)}
+   199→        except asyncio.TimeoutError:
+   200→            return name, [], {"status": "timeout", "ms": _elapsed_ms(start)}
+   201→        except Exception as exc:
+   202→            return name, [], {"status": f"error:{type(exc).__name__}", "ms": _elapsed_ms(start)}
+   203→
+   204→    pairs = await asyncio.gather(*(run_one(name, coro) for name, coro in tasks.items()))
+   205→    rows = {name: row_list for name, row_list, _ in pairs}
+   206→    diagnostics = {name: diagnostic for name, _, diagnostic in pairs}
+   207→    return rows, diagnostics
+   208→
+   209→
+   210→async def _filename_leg(req: SmartSearchRequest, fetch: int) -> list[dict]:
+   211→    terms = _terms(req.query, 5)
+   212→    params: dict[str, Any] = {"fetch": fetch}
+   213→    where_clause = _filter_clause(req, params)
+   214→    like_clauses = []
+   215→    for index, term in enumerate(terms):
+   216→        key = f"filename_term_{index}"
+   217→        params[key] = f"%{term}%"
+   218→        like_clauses.append(f"lower(d.filename) LIKE :{key}")
+   219→    if not like_clauses:
+   220→        return []
+   221→    async with async_session() as session:
+   222→        result = await session.execute(
+   223→            text(
+   224→                f"""
+   225→                SELECT d.id AS document_id, d.filename, d.content_type, d.collection_id,
+   226→                       d.language, 1.0 AS score, d.filename AS snippet
+   227→                FROM documents d
+   228→                WHERE {where_clause} AND ({' OR '.join(like_clauses)})
+   229→                ORDER BY d.updated_at DESC NULLS LAST, d.id DESC
+   230→                LIMIT :fetch
+   231→                """
+   232→            ),
+   233→            params,
+   234→        )
+   235→        return [dict(row) for row in result.mappings()]
+   236→
+   237→
+   238→async def _document_fts_leg(req: SmartSearchRequest, fetch: int) -> list[dict]:
+   239→    params: dict[str, Any] = {"query": req.query, "fetch": fetch}
+   240→    where_clause = _filter_clause(req, params)
+   241→    sql = """
+   242→        SELECT c.id AS chunk_id, c.document_id, c.chunk_text, c.chunk_index, c.page_number,
+   243→               ts_rank_cd(c.search_vector, websearch_to_tsquery('english', :query)) AS score,
+   244→               d.filename, d.content_type, d.collection_id, d.language
+   245→        FROM document_chunks c
+   246→        JOIN documents d ON d.id = c.document_id
+   247→        WHERE {where_clause}
+   248→          AND c.search_vector @@ websearch_to_tsquery('english', :query)
+   249→        ORDER BY score DESC, c.id
+   250→        LIMIT :fetch
+   251→    """
+   252→    async with async_session() as session:
+   253→        result = await session.execute(text(sql.format(where_clause=where_clause)), params)
+   254→        rows = [dict(row) for row in result.mappings()]
+   255→        if rows or _is_quoted(req.query):
+   256→            return rows
+   257→        terms = _terms(req.query)
+   258→        if not terms:
+   259→            return rows
+   260→        params["or_query"] = " | ".join(terms)
+   261→        fallback_sql = """
+   262→            SELECT c.id AS chunk_id, c.document_id, c.chunk_text, c.chunk_index, c.page_number,
+   263→                   ts_rank_cd(c.search_vector, to_tsquery('english', :or_query)) AS score,
+   264→                   d.filename, d.content_type, d.collection_id, d.language
+   265→            FROM document_chunks c
+   266→            JOIN documents d ON d.id = c.document_id
+   267→            WHERE {where_clause}
+   268→              AND c.search_vector @@ to_tsquery('english', :or_query)
+   269→            ORDER BY score DESC, c.id
+   270→            LIMIT :fetch
+   271→        """
+   272→        result = await session.execute(text(fallback_sql.format(where_clause=where_clause)), params)
+   273→        return [dict(row) for row in result.mappings()]
+   274→
+   275→
+   276→async def _segment_fts_leg(req: SmartSearchRequest, fetch: int) -> list[dict]:
+   277→    params: dict[str, Any] = {"query": req.query, "fetch": fetch}
+   278→    where_clause = _filter_clause(req, params)
+   279→    async with async_session() as session:
+   280→        result = await session.execute(
+   281→            text(
+   282→                f"""
+   283→                SELECT s.id AS segment_id, s.document_id, s.segment_text, s.start_time, s.end_time,
+   284→                       ts_rank(to_tsvector('simple', s.segment_text), websearch_to_tsquery('simple', :query)) AS score,
+   285→                       d.filename, d.content_type, d.collection_id, d.language
+   286→                FROM document_segments s
+   287→                JOIN documents d ON d.id = s.document_id
+   288→                WHERE {where_clause}
+   289→                  AND to_tsvector('simple', s.segment_text) @@ websearch_to_tsquery('simple', :query)
+   290→                ORDER BY score DESC, s.id
+   291→                LIMIT :fetch
+   292→                """
+   293→            ),
+   294→            params,
+   295→        )
+   296→        return [dict(row) for row in result.mappings()]
+   297→
+   298→
+   299→async def _visual_ocr_leg(req: SmartSearchRequest, fetch: int) -> list[dict]:
+   300→    params: dict[str, Any] = {"query": req.query, "fetch": fetch}
+   301→    where_clause = _filter_clause(req, params)
+   302→    async with async_session() as session:
+   303→        result = await session.execute(
+   304→            text(
+   305→                f"""
+   306→                SELECT va.id AS asset_id, va.document_id, va.asset_type, va.page_number,
+   307→                       va.start_time, va.end_time, va.ocr_text,
+   308→                       ts_rank(to_tsvector('simple', coalesce(va.ocr_text, '')),
+   309→                               websearch_to_tsquery('simple', :query)) AS score,
+   310→                       d.filename, d.content_type, d.collection_id, d.language
+   311→                FROM visual_assets va
+   312→                JOIN documents d ON d.id = va.document_id
+   313→                WHERE {where_clause}
+   314→                  AND to_tsvector('simple', coalesce(va.ocr_text, '')) @@ websearch_to_tsquery('simple', :query)
+   315→                ORDER BY score DESC, va.id
+   316→                LIMIT :fetch
+   317→                """
+   318→            ),
+   319→            params,
+   320→        )
+   321→        return [dict(row) for row in result.mappings()]
+   322→
+   323→
+   324→async def _visual_object_leg(req: SmartSearchRequest, object_terms: list[str], fetch: int) -> list[dict]:
+   325→    if not object_terms:
+   326→        return []
+   327→    params: dict[str, Any] = {"labels": object_terms, "fetch": fetch}
+   328→    where_clause = _filter_clause(req, params)
+   329→    async with async_session() as session:
+   330→        result = await session.execute(
+   331→            text(
+   332→                f"""
+   333→                SELECT va.id AS asset_id, va.document_id, va.asset_type, va.page_number,
+   334→                       va.start_time, va.end_time, va.ocr_text,
+   335→                       MAX(vl.confidence) AS score,
+   336→                       d.filename, d.content_type, d.collection_id, d.language
+   337→                FROM visual_assets va
+   338→                JOIN visual_labels vl ON vl.asset_id = va.id
+   339→                JOIN documents d ON d.id = va.document_id
+   340→                WHERE {where_clause}
+   341→                  AND lower(vl.label) = ANY(CAST(:labels AS text[]))
+   342→                GROUP BY va.id, d.id
+   343→                ORDER BY score DESC, va.id
+   344→                LIMIT :fetch
+   345→                """
+   346→            ),
+   347→            params,
+   348→        )
+   349→        return [dict(row) for row in result.mappings()]
+   350→
+   351→
+   352→async def _cached_document_embedding(query: str) -> list[float] | None:
+   353→    cache_key = f"seekra:embedding:document:{stable_hash(query)}"
+   354→    cached = await cache_get_json(cache_key)
+   355→    if isinstance(cached, list):
+   356→        return [float(x) for x in cached]
+   357→    async with _DOC_MODEL_LOCK:
+   358→        vector = await asyncio.to_thread(get_embedding, query)
+   359→    await cache_set_json(cache_key, vector, EMBEDDING_CACHE_TTL)
+   360→    return vector
+   361→
+   362→
+   363→async def _cached_visual_embedding(query: str) -> list[float] | None:
+   364→    cache_key = f"seekra:embedding:visual-text:{stable_hash(query)}"
+   365→    cached = await cache_get_json(cache_key)
+   366→    if isinstance(cached, list):
+   367→        return [float(x) for x in cached]
+   368→    async with _VISUAL_MODEL_LOCK:
+   369→        vector = await asyncio.to_thread(embed_visual_text, query)
+   370→    await cache_set_json(cache_key, vector, EMBEDDING_CACHE_TTL)
+   371→    return vector
+   372→
+   373→
+   374→async def _document_vector_leg(req: SmartSearchRequest, embedding: list[float], fetch: int) -> list[dict]:
+   375→    params: dict[str, Any] = {"embedding": str(embedding), "fetch": fetch}
+   376→    where_clause = _filter_clause(req, params)
+   377→    async with async_session() as session:
+   378→        result = await session.execute(
+   379→            text(
+   380→                f"""
+   381→                SELECT c.id AS chunk_id, c.document_id, c.chunk_text, c.chunk_index, c.page_number,
+   382→                       1 - (c.embedding <=> CAST(:embedding AS vector)) AS score,
+   383→                       d.filename, d.content_type, d.collection_id, d.language
+   384→                FROM document_chunks c
+   385→                JOIN documents d ON d.id = c.document_id
+   386→                WHERE {where_clause} AND c.embedding IS NOT NULL
+   387→                ORDER BY c.embedding <=> CAST(:embedding AS vector)
+   388→                LIMIT :fetch
+   389→                """
+   390→            ),
+   391→            params,
+   392→        )
+   393→        return [row for row in (dict(r) for r in result.mappings()) if float(row["score"] or 0) >= DOC_SIM_FLOOR]
+   394→
+   395→
+   396→async def _segment_vector_leg(req: SmartSearchRequest, embedding: list[float], fetch: int) -> list[dict]:
+   397→    params: dict[str, Any] = {"embedding": str(embedding), "fetch": fetch}
+   398→    where_clause = _filter_clause(req, params)
+   399→    async with async_session() as session:
+   400→        result = await session.execute(
+   401→            text(
+   402→                f"""
+   403→                SELECT s.id AS segment_id, s.document_id, s.segment_text, s.start_time, s.end_time,
+   404→                       1 - (s.embedding <=> CAST(:embedding AS vector)) AS score,
+   405→                       d.filename, d.content_type, d.collection_id, d.language
+   406→                FROM document_segments s
+   407→                JOIN documents d ON d.id = s.document_id
+   408→                WHERE {where_clause} AND s.embedding IS NOT NULL
+   409→                ORDER BY s.embedding <=> CAST(:embedding AS vector)
+   410→                LIMIT :fetch
+   411→                """
+   412→            ),
+   413→            params,
+   414→        )
+   415→        return [row for row in (dict(r) for r in result.mappings()) if float(row["score"] or 0) >= SEG_SIM_FLOOR]
+   416→
+   417→
+   418→async def _visual_vector_leg(req: SmartSearchRequest, embedding: list[float], fetch: int) -> list[dict]:
+   419→    params: dict[str, Any] = {"embedding": str(embedding), "fetch": fetch}
+   420→    where_clause = _filter_clause(req, params)
+   421→    async with async_session() as session:
+   422→        result = await session.execute(
+   423→            text(
+   424→                f"""
+   425→                SELECT va.id AS asset_id, va.document_id, va.asset_type, va.page_number,
+   426→                       va.start_time, va.end_time, va.ocr_text,
+   427→                       1 - (va.embedding <=> CAST(:embedding AS vector)) AS score,
+   428→                       d.filename, d.content_type, d.collection_id, d.language
+   429→                FROM visual_assets va
+   430→                JOIN documents d ON d.id = va.document_id
+   431→                WHERE {where_clause} AND va.embedding IS NOT NULL
+   432→                ORDER BY va.embedding <=> CAST(:embedding AS vector)
+   433→                LIMIT :fetch
+   434→                """
+   435→            ),
+   436→            params,
+   437→        )
+   438→        return [row for row in (dict(r) for r in result.mappings()) if float(row["score"] or 0) >= VISUAL_SIM_FLOOR]
+   439→
+   440→
+   441→async def _document_semantic_task(req: SmartSearchRequest, fetch: int) -> dict[str, list[dict]]:
+   442→    embedding = await _cached_document_embedding(req.query)
+   443→    if not embedding:
+   444→        return {"document_vector": [], "segment_vector": []}
+   445→    document_rows, segment_rows = await asyncio.gather(
+   446→        _document_vector_leg(req, embedding, fetch),
+   447→        _segment_vector_leg(req, embedding, fetch),
+   448→    )
+   449→    return {"document_vector": document_rows, "segment_vector": segment_rows}
+   450→
+   451→
+   452→async def _visual_semantic_task(req: SmartSearchRequest, fetch: int) -> dict[str, list[dict]]:
+   453→    embedding = await _cached_visual_embedding(req.query)
+   454→    if not embedding:
+   455→        return {"visual_vector": []}
+   456→    return {"visual_vector": await _visual_vector_leg(req, embedding, fetch)}
+   457→
+   458→
+   459→def _snippet(text_value: str | None, query: str, length: int = 260) -> str:
+   460→    value = " ".join((text_value or "").split())
+   461→    if not value:
+   462→        return ""
+   463→    lower_value = value.lower()
+   464→    terms = _terms(query, 4)
+   465→    position = -1
+   466→    for term in terms:
+   467→        position = lower_value.find(term.lower())
+   468→        if position >= 0:
+   469→            break
+   470→    if position < 0:
+   471→        return value[:length]
+   472→    start = max(0, position - 70)
+   473→    end = min(len(value), position + 170)
+   474→    return ("…" if start else "") + value[start:end] + ("…" if end < len(value) else "")
+   475→
+   476→
+   477→def _new_document_result(row: dict) -> dict:
+   478→    return {
+   479→        "result_type": "document",
+   480→        "document_id": int(row["document_id"]),
+   481→        "filename": row["filename"],
+   482→        "content_type": row.get("content_type"),
+   483→        "collection_id": row.get("collection_id"),
+   484→        "language": row.get("language"),
+   485→        "score": 0.0,
+   486→        "match_reasons": [],
+   487→        "chunks": [],
+   488→        "segments": [],
+   489→        "snippet": "",
+   490→        "_legs": set(),
+   491→        "_chunk_ids": set(),
+   492→        "_segment_ids": set(),
+   493→    }
+   494→
+   495→
+   496→def _add_doc_leg(docs: dict[int, dict], leg: str, rows: list[dict], reason: str) -> None:
+   497→    for rank, row in enumerate(rows, start=1):
+   498→        doc_id = int(row["document_id"])
+   499→        item = docs.setdefault(doc_id, _new_document_result(row))
+   500→        if leg not in item["_legs"]:
+   501→            item["_legs"].add(leg)
+   502→            item["score"] += _rrf(rank)
+   503→            if reason not in item["match_reasons"]:
+   504→                item["match_reasons"].append(reason)
+   505→        if "chunk_id" in row and row["chunk_id"] not in item["_chunk_ids"]:
+   506→            item["_chunk_ids"].add(row["chunk_id"])
+   507→            item["chunks"].append({
+   508→                "chunk_text": row.get("chunk_text") or "",
+   509→                "chunk_index": row.get("chunk_index"),
+   510→                "page_number": row.get("page_number"),
+   511→                "match": "keyword" if "fts" in leg or leg == "filename" else "vector",
+   512→                "similarity": round(float(row.get("score") or 0), 4),
+   513→                "score": round(_rrf(rank), 4),
+   514→            })
+   515→        if "segment_id" in row and row["segment_id"] not in item["_segment_ids"]:
+   516→            item["_segment_ids"].add(row["segment_id"])
+   517→            item["segments"].append({
+   518→                "segment_text": row.get("segment_text") or "",
+   519→                "start_time": row.get("start_time"),
+   520→                "end_time": row.get("end_time"),
+   521→                "similarity": round(float(row.get("score") or 0), 4),
+   522→                "score": round(_rrf(rank), 4),
+   523→            })
+   524→        if not item["snippet"]:
+   525→            item["snippet"] = _snippet(row.get("chunk_text") or row.get("segment_text") or row.get("snippet"), "")
+   526→
+   527→
+   528→def _document_qualifies(item: dict, query_arabic: bool) -> bool:
+   529→    exact_legs = {"filename", "document_fts", "segment_fts"}
+   530→    if item["_legs"] & exact_legs:
+   531→        return True
+   532→
+   533→    # Smart Search should surface genuinely relevant semantic-only matches, but
+   534→    # keep a higher same-language bar to avoid the noisy behavior that the old
+   535→    # product rule was protecting against.
+   536→    semantic_scores = [row.get("similarity", 0) for row in item.get("chunks", [])]
+   537→    semantic_scores += [row.get("similarity", 0) for row in item.get("segments", [])]
+   538→    best_score = max(semantic_scores, default=0.0)
+   539→    language = item.get("language")
+   540→    cross_language = bool(language) and (
+   541→        (query_arabic and language != "ar") or ((not query_arabic) and language == "ar")
+   542→    )
+   543→    return best_score >= (0.44 if cross_language else 0.58)
+   544→
+   545→
+   546→def _build_document_results(stage_rows: dict[str, list[dict]], query: str, query_arabic: bool) -> list[dict]:
+   547→    docs: dict[int, dict] = {}
+   548→    _add_doc_leg(docs, "filename", stage_rows.get("filename", []), "Filename match")
+   549→    _add_doc_leg(docs, "document_fts", stage_rows.get("document_fts", []), "Text match")
+   550→    _add_doc_leg(docs, "segment_fts", stage_rows.get("segment_fts", []), "Transcript match")
+   551→    _add_doc_leg(docs, "document_vector", stage_rows.get("document_vector", []), "Semantic match")
+   552→    _add_doc_leg(docs, "segment_vector", stage_rows.get("segment_vector", []), "Semantic audio match")
+   553→
+   554→    output = []
+   555→    for item in docs.values():
+   556→        if not _document_qualifies(item, query_arabic):
+   557→            continue
+   558→        item["chunks"] = sorted(item["chunks"], key=lambda row: row["score"], reverse=True)[:3]
+   559→        item["segments"] = sorted(item["segments"], key=lambda row: row["score"], reverse=True)[:3]
+   560→        item["pages"] = sorted({row["page_number"] for row in item["chunks"] if row.get("page_number") is not None})
+   561→        if not item["snippet"]:
+   562→            first_chunk = item["chunks"][0]["chunk_text"] if item["chunks"] else ""
+   563→            first_segment = item["segments"][0]["segment_text"] if item["segments"] else ""
+   564→            item["snippet"] = _snippet(first_chunk or first_segment, query)
+   565→        else:
+   566→            item["snippet"] = _snippet(item["snippet"], query)
+   567→        item["score"] = round(item["score"], 6)
+   568→        item.pop("_legs", None)
+   569→        item.pop("_chunk_ids", None)
+   570→        item.pop("_segment_ids", None)
+   571→        output.append(item)
+   572→    return output
+   573→
+   574→
+   575→def _new_visual_result(row: dict) -> dict:
+   576→    return {
+   577→        "result_type": "visual_asset",
+   578→        "asset_id": int(row["asset_id"]),
+   579→        "document_id": int(row["document_id"]),
+   580→        "filename": row["filename"],
+   581→        "content_type": row.get("content_type"),
+   582→        "collection_id": row.get("collection_id"),
+   583→        "language": row.get("language"),
+   584→        "asset_type": row.get("asset_type"),
+   585→        "page_number": row.get("page_number"),
+   586→        "start_time": row.get("start_time"),
+   587→        "end_time": row.get("end_time"),
+   588→        "score": 0.0,
+   589→        "match_reasons": [],
+   590→        "labels": [],
+   591→        "snippet": _snippet(row.get("ocr_text"), ""),
+   592→        "_legs": set(),
+   593→        "_vector_scores": [],
+   594→    }
+   595→
+   596→
+   597→def _add_visual_leg(assets: dict[int, dict], leg: str, rows: list[dict], reason: str) -> None:
+   598→    for rank, row in enumerate(rows, start=1):
+   599→        asset_id = int(row["asset_id"])
+   600→        item = assets.setdefault(asset_id, _new_visual_result(row))
+   601→        if leg not in item["_legs"]:
+   602→            item["_legs"].add(leg)
+   603→            item["score"] += _rrf(rank)
+   604→            if reason not in item["match_reasons"]:
+   605→                item["match_reasons"].append(reason)
+   606→        if leg == "visual_vector":
+   607→            item["_vector_scores"].append(float(row.get("score") or 0))
+   608→
+   609→
+   610→def _build_visual_results(stage_rows: dict[str, list[dict]], query: str, image_search: bool = False) -> list[dict]:
+   611→    assets: dict[int, dict] = {}
+   612→    _add_visual_leg(assets, "visual_ocr", stage_rows.get("visual_ocr", []), "Text inside image")
+   613→    _add_visual_leg(assets, "visual_object", stage_rows.get("visual_object", []), "Object match")
+   614→    _add_visual_leg(assets, "visual_vector", stage_rows.get("visual_vector", []), "Visual match")
+   615→
+   616→    vector_scores = [float(row.get("score") or 0) for row in stage_rows.get("visual_vector", [])]
+   617→    top_vector_score = max(vector_scores, default=0.0)
+   618→    if image_search:
+   619→        semantic_floor = max(VISUAL_SIM_FLOOR, top_vector_score - IMAGE_SIM_RELATIVE_DROP)
+   620→    else:
+   621→        semantic_floor = max(VISUAL_SEMANTIC_ONLY_FLOOR, top_vector_score - VISUAL_RELATIVE_DROP)
+   622→
+   623→    output = []
+   624→    for item in assets.values():
+   625→        exact_legs = item["_legs"] & {"visual_ocr", "visual_object"}
+   626→        best_vector_score = max(item.get("_vector_scores", []), default=0.0)
+   627→        if not exact_legs and best_vector_score < semantic_floor:
+   628→            continue
+   629→        item["snippet"] = _snippet(item.get("snippet"), query)
+   630→        item["score"] = round(item["score"], 6)
+   631→        item.pop("_legs", None)
+   632→        item.pop("_vector_scores", None)
+   633→        output.append(item)
+   634→    return output
+   635→
+   636→
+   637→async def _attach_visual_labels(db: AsyncSession, results: list[dict]) -> None:
+   638→    asset_ids = [int(row["asset_id"]) for row in results if row.get("result_type") == "visual_asset"]
+   639→    if not asset_ids:
+   640→        return
+   641→    result = await db.execute(
+   642→        text(
+   643→            """
+   644→            SELECT asset_id, label, confidence
+   645→            FROM visual_labels
+   646→            WHERE asset_id = ANY(CAST(:asset_ids AS int[]))
+   647→            ORDER BY asset_id, confidence DESC
+   648→            """
+   649→        ),
+   650→        {"asset_ids": asset_ids},
+   651→    )
+   652→    labels: dict[int, list[str]] = {}
+   653→    for row in result.mappings():
+   654→        rows = labels.setdefault(int(row.asset_id), [])
+   655→        if len(rows) < 6 and row.label not in rows:
+   656→            rows.append(row.label)
+   657→    for row in results:
+   658→        if row.get("result_type") == "visual_asset":
+   659→            row["labels"] = labels.get(int(row["asset_id"]), [])
+   660→
+   661→
+   662→def _fold_hit_into(parent: dict, row: dict) -> None:
+   663→    """Fold one hit into a parent card: half its score, its match reasons, and
+   664→    a `matched_visuals` attachment the UI can surface."""
+   665→    parent["score"] = round(float(parent["score"]) + float(row["score"]) * 0.5, 6)
+   666→    for reason in row.get("match_reasons", []):
+   667→        if reason not in parent["match_reasons"]:
+   668→            parent["match_reasons"].append(reason)
+   669→    parent.setdefault("matched_visuals", []).append({
+   670→        "asset_id": row.get("asset_id"),
+   671→        "asset_type": row.get("asset_type"),
+   672→        "page_number": row.get("page_number"),
+   673→        "start_time": row.get("start_time"),
+   674→        "end_time": row.get("end_time"),
+   675→        "score": row.get("score"),
+   676→        "match_reasons": row.get("match_reasons", []),
+   677→        "labels": row.get("labels", []),
+   678→        "snippet": row.get("snippet", ""),
+   679→    })
+   680→
+   681→
+   682→def _merge_visual_hits_into_documents(results: list[dict]) -> list[dict]:
+   683→    """One card per file: fold visual_asset hits into their parent document
+   684→    when both are present, and group standalone visual hits (e.g. several
+   685→    frames of the same video) into the best-scoring card."""
+   686→    docs = {int(r["document_id"]): r for r in results if r.get("result_type") == "document"}
+   687→    visual_groups: dict[int, dict] = {}
+   688→    merged: list[dict] = []
+   689→    for row in results:
+   690→        if row.get("result_type") != "visual_asset":
+   691→            merged.append(row)
+   692→            continue
+   693→        doc_id = int(row["document_id"])
+   694→        parent = docs.get(doc_id) or visual_groups.get(doc_id)
+   695→        if parent is not None:
+   696→            _fold_hit_into(parent, row)
+   697→            continue
+   698→        visual_groups[doc_id] = row
+   699→        merged.append(row)
+   700→    merged.sort(key=lambda r: r["score"], reverse=True)
+   701→    return merged
+   702→
+   703→
+   704→async def _finalize_results(db: AsyncSession, results: list[dict]) -> list[dict]:
+   705→    document_ids = [int(row["document_id"]) for row in results]
+   706→    pii_map = await get_document_pii_map(db, document_ids)
+   707→    visual_map = await get_document_visual_map(db, document_ids)
+   708→    for row in results:
+   709→        row["pii"] = pii_for_document(pii_map, row["document_id"])
+   710→        row["visual"] = visual_for_document(visual_map, row["document_id"])
+   711→        row["id"] = f"asset:{row['asset_id']}" if row.get("result_type") == "visual_asset" else f"doc:{row['document_id']}"
+   712→    return results
+   713→
+   714→
+   715→@router.post("/")
+   716→async def smart_search(
+   717→    req: SmartSearchRequest,
+   718→    current_user: User = Depends(require_content_user()),
+   719→    db: AsyncSession = Depends(get_db),
+   720→):
+   721→    started = time.perf_counter()
+   722→    current_search_user.set(current_user)  # 18A2: legs enforce collection permissions
+   723→    query = _normalize_query(req.query)
+   724→    req.query = query
+   725→    fetch = max(20, req.limit * FETCH_FACTOR)
+   726→
+   727→    cache_key = "seekra:smart-search:result:v6:" + stable_hash({
+   728→        "query": query,
+   729→        "limit": req.limit,
+   730→        "collection_id": req.collection_id,
+   731→        "document_ids": req.document_ids or [],
+   732→        "categories": sorted(req.categories or []),
+   733→        "language": req.language or "",
+   734→        "date_from": req.date_from or "",
+   735→        "date_to": req.date_to or "",
+   736→        "has_pii": bool(req.has_pii),
+   737→        "has_visuals": bool(req.has_visuals),
+   738→        "user_id": current_user.id,
+   739→        "role": current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role),
+   740→    })
+   741→    cached = await cache_get_json(cache_key)
+   742→    if isinstance(cached, dict):
+   743→        cached["cache_hit"] = True
+   744→        return cached
+   745→
+   746→    known_labels = await _known_visual_labels(db)
+   747→    plan = _make_plan(query, known_labels)
+   748→
+   749→    stage_a_tasks = {
+   750→        "filename": _filename_leg(req, fetch),
+   751→        "document_fts": _document_fts_leg(req, fetch),
+   752→        "segment_fts": _segment_fts_leg(req, fetch),
+   753→        "visual_ocr": _visual_ocr_leg(req, fetch),
+   754→    }
+   755→    if plan["object_terms"]:
+   756→        stage_a_tasks["visual_object"] = _visual_object_leg(req, plan["object_terms"], fetch)
+   757→
+   758→    stage_a_rows, stage_a_diag = await _run_timed_tasks(stage_a_tasks, timeout_seconds=0.7)
+   759→    exact_hits = sum(len(rows) for rows in stage_a_rows.values())
+   760→
+   761→    stage_b_tasks: dict[str, Any] = {}
+   762→    selected_stage_b: list[str] = []
+   763→    sufficient_exact_hits = min(req.limit, 5)
+   764→    object_hit_count = len(stage_a_rows.get("visual_object", []))
+   765→
+   766→    # Do not invoke semantic models when fast exact/object indexes already have
+   767→    # enough evidence. Semantic legs are reserved for descriptive or weak searches.
+   768→    should_run_document_semantic = not plan["quoted"] and (
+   769→        plan["descriptive"] or exact_hits < sufficient_exact_hits
+   770→    )
+   771→    should_run_visual_semantic = (
+   772→        (plan["visual_intent"] and (plan["descriptive"] or object_hit_count < 3))
+   773→        or ((not plan["visual_intent"]) and exact_hits == 0)
+   774→    )
+   775→
+   776→    if should_run_document_semantic:
+   777→        stage_b_tasks["document_semantic"] = _document_semantic_task(req, fetch)
+   778→        selected_stage_b.append("document_semantic")
+   779→    if should_run_visual_semantic:
+   780→        stage_b_tasks["visual_semantic"] = _visual_semantic_task(req, fetch)
+   781→        selected_stage_b.append("visual_semantic")
+   782→
+   783→    stage_b_rows: dict[str, list[dict]] = {}
+   784→    stage_b_diag: dict[str, dict] = {}
+   785→    if stage_b_tasks:
+   786→        timeout = 1.8 if exact_hits == 0 else 1.2
+   787→        semantic_rows, stage_b_diag = await _run_timed_tasks(stage_b_tasks, timeout_seconds=timeout)
+   788→        for group_rows in semantic_rows.values():
+   789→            stage_b_rows.update(group_rows)
+   790→
+   791→    all_rows = {**stage_a_rows, **stage_b_rows}
+   792→    document_results = _build_document_results(all_rows, query, plan["arabic"])
+   793→    visual_results = _build_visual_results(all_rows, query)
+   794→    combined = sorted(document_results + visual_results, key=lambda row: row["score"], reverse=True)
+   795→    combined = _merge_visual_hits_into_documents(combined)
+   796→    total = len(combined)
+   797→    # Facet counts over the full (pre-limit) filtered match set
+   798→    facet_categories: dict[str, int] = {}
+   799→    facet_languages: dict[str, int] = {}
+   800→    for row in combined:
+   801→        bucket = _category_for_mime(row.get("content_type"))
+   802→        facet_categories[bucket] = facet_categories.get(bucket, 0) + 1
+   803→        lang = (row.get("language") or "").strip() or "unknown"
+   804→        facet_languages[lang] = facet_languages.get(lang, 0) + 1
+   805→    combined = combined[: req.limit]
+   806→    await _attach_visual_labels(db, combined)
+   807→    combined = await _finalize_results(db, combined)
+   808→
+   809→    diagnostics = {**stage_a_diag, **stage_b_diag}
+   810→    leg_counts = {name: len(rows) for name, rows in all_rows.items()}
+   811→    partial = any(item.get("status") == "timeout" for item in diagnostics.values())
+   812→
+   813→    flagged_count = sum(1 for row in combined if row.get("pii", {}).get("flagged"))
+   814→    if flagged_count:
+   815→        await audit_event(
+   816→            db,
+   817→            None,
+   818→            current_user.id,
+   819→            "CONTENT_PII_FLAGGED_RESULT",
+   820→            f"Smart search returned {flagged_count} PII-flagged document(s)",
+   821→        )
+   822→
+   823→    response = {
+   824→        "query": query,
+   825→        "results": combined,
+   826→        "total": total,
+   827→        "filters": {
+   828→            "categories": sorted(req.categories or []),
+   829→            "language": req.language or None,
+   830→            "date_from": req.date_from or None,
+   831→            "date_to": req.date_to or None,
+   832→            "has_pii": bool(req.has_pii),
+   833→            "has_visuals": bool(req.has_visuals),
+   834→        },
+   835→        "facets": {
+   836→            "categories": facet_categories,
+   837→            "languages": facet_languages,
+   838→        },
+   839→        "legs": leg_counts,
+   840→        "planner": {
+   841→            "quoted": plan["quoted"],
+   842→            "arabic": plan["arabic"],
+   843→            "descriptive": plan["descriptive"],
+   844→            "visual_intent": plan["visual_intent"],
+   845→            "object_terms": plan["object_terms"],
+   846→            "stage_a": plan["stage_a"],
+   847→            "stage_b": selected_stage_b,
+   848→        },
+   849→        "timing_ms": {
+   850→            "total": _elapsed_ms(started),
+   851→            **{name: item.get("ms", 0) for name, item in diagnostics.items()},
+   852→        },
+   853→        "diagnostics": diagnostics,
+   854→        "partial": partial,
+   855→        "cache_hit": False,
+   856→    }
+   857→    if not partial:
+   858→        await cache_set_json(cache_key, response, RESULT_CACHE_TTL)
+   859→    print(
+   860→        "[SMART-SEARCH] "
+   861→        f"query_hash={stable_hash(query)[:12]} total_ms={response['timing_ms']['total']} "
+   862→        f"results={len(combined)} legs={leg_counts} partial={partial}",
+   863→        flush=True,
+   864→    )
+   865→    return response
+   866→
+   867→
+   868→@router.post("/image")
+   869→async def smart_search_by_image(
+   870→    file: UploadFile = File(...),
+   871→    limit: int = Query(default=20, ge=1, le=50),
+   872→    current_user: User = Depends(require_content_user()),
+   873→    db: AsyncSession = Depends(get_db),
+   874→):
+   875→    started = time.perf_counter()
+   876→    data = await file.read()
+   877→    if not data:
+   878→        raise HTTPException(status_code=400, detail="Reference image is empty")
+   879→    if len(data) > 8 * 1024 * 1024:
+   880→        raise HTTPException(status_code=413, detail="Reference image must be 8 MB or smaller")
+   881→    try:
+   882→        image = Image.open(io.BytesIO(data)).convert("RGB")
+   883→    except Exception:
+   884→        raise HTTPException(status_code=400, detail="Unsupported reference image")
+   885→
+   886→    try:
+   887→        async with _VISUAL_MODEL_LOCK:
+   888→            embedding = await asyncio.wait_for(
+   889→                asyncio.to_thread(embed_visual_image, image),
+   890→                timeout=2.5,
+   891→            )
+   892→    except asyncio.TimeoutError:
+   893→        raise HTTPException(status_code=503, detail="Visual model is warming up. Please retry.")
+   894→    except Exception as exc:
+   895→        raise HTTPException(status_code=503, detail=f"Visual model unavailable: {exc}")
+   896→
+   897→    req = SmartSearchRequest(query=file.filename or "reference image", limit=limit)
+   898→    current_search_user.set(current_user)  # 18A2: enforce collection permissions
+   899→    rows = await _visual_vector_leg(req, embedding, max(20, limit * 3))
+   900→    visual_results = _build_visual_results({"visual_vector": rows}, req.query, image_search=True)
+   901→    visual_results = visual_results[:limit]
+   902→    await _attach_visual_labels(db, visual_results)
+   903→    visual_results = await _finalize_results(db, visual_results)
+   904→
+   905→    return {
+   906→        "query": file.filename or "reference image",
+   907→        "results": visual_results,
+   908→        "total": len(visual_results),
+   909→        "legs": {"image_similarity": len(rows)},
+   910→        "planner": {"image_search": True},
+   911→        "timing_ms": {"total": _elapsed_ms(started)},
+   912→        "partial": False,
+   913→        "cache_hit": False,
+   914→    }
+   915→

@@ -1,0 +1,650 @@
+     1→     1→import os
+     2→     2→import io
+     3→     3→import re
+     4→     4→import math
+     5→     5→import asyncio
+     6→     6→import psycopg2
+     7→     7→from celery import Celery
+     8→     8→from app.config import get_settings
+     9→     9→from app.services.pii_detection import detect_pii, highest_risk
+    10→    10→from app.services.visual_ai import release_visual_models
+    11→    11→import unicodedata
+    12→    12→
+    13→    13→
+    14→    14→def _nfkc(s):
+    15→    15→    """NFKC-normalize extracted text (folds Arabic presentation forms to standard chars)."""
+    16→    16→    return unicodedata.normalize("NFKC", s) if isinstance(s, str) else s
+    17→    17→
+    18→    18→settings = get_settings()
+    19→    19→
+    20→    20→celery_app = Celery("genoa", broker=settings.redis_url, backend=settings.redis_url)
+    21→    21→
+    22→    22→IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.tiff', '.bmp', '.webp']
+    23→    23→AUDIO_EXTS = ['.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac']
+    24→    24→VIDEO_EXTS = ['.mp4', '.mov', '.mkv', '.avi', '.webm', '.m4v']
+    25→    25→# Step 28: Office formats that LibreOffice can render to PDF for in-browser viewing
+    26→    26→OFFICE_EXTS = ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.odt', '.ods', '.odp', '.rtf']
+    27→    27→
+    28→    28→
+    29→    29→# ---------------- DB helpers (schema-tolerant: old + new columns) ----------------
+    30→    30→
+    31→    31→def _connect():
+    32→    32→    db_url = settings.database_url.replace("+asyncpg", "")
+    33→    33→    return psycopg2.connect(db_url)
+    34→    34→
+    35→    35→def _table_columns(cur, table: str) -> set:
+    36→    36→    cur.execute(
+    37→    37→        "SELECT column_name FROM information_schema.columns WHERE table_name = %s",
+    38→    38→        (table,))
+    39→    39→    return {row[0] for row in cur.fetchall()}
+    40→    40→
+    41→    41→def _vector_dim(cur, table: str, column: str):
+    42→    42→    """pgvector dimension of a column, or None if not a vector column."""
+    43→    43→    try:
+    44→    44→        cur.execute(
+    45→    45→            "SELECT atttypmod FROM pg_attribute WHERE attrelid = %s::regclass AND attname = %s",
+    46→    46→            (table, column))
+    47→    47→        row = cur.fetchone()
+    48→    48→        if row and row[0] and row[0] > 0:
+    49→    49→            return row[0]
+    50→    50→    except Exception:
+    51→    51→        pass
+    52→    52→    return None
+    53→    53→
+    54→    54→def _update_document(cur, conn, doc_id: int, values: dict):
+    55→    55→    """UPDATE documents using only columns that actually exist."""
+    56→    56→    cols = _table_columns(cur, "documents")
+    57→    57→    sets, params = [], []
+    58→    58→    for col, val in values.items():
+    59→    59→        if col in cols:
+    60→    60→            sets.append(f"{col} = %s")
+    61→    61→            params.append(val)
+    62→    62→    if "updated_at" in cols:
+    63→    63→        sets.append("updated_at = NOW()")
+    64→    64→    if not sets:
+    65→    65→        return
+    66→    66→    params.append(doc_id)
+    67→    67→    cur.execute(f"UPDATE documents SET {', '.join(sets)} WHERE id = %s", params)
+    68→    68→    conn.commit()
+    69→    69→
+    70→    70→def _set_status(cur, conn, doc_id: int, status: str):
+    71→    71→    try:
+    72→    72→        _update_document(cur, conn, doc_id, {"status": status})
+    73→    73→    except Exception:
+    74→    74→        try:
+    75→    75→            conn.rollback()
+    76→    76→        except Exception:
+    77→    77→            pass
+    78→    78→
+    79→    79→
+    80→    80→def _set_stage(cur, conn, doc_id: int, stage: str, progress=None):
+    81→    81→    """Write pipeline stage (+ optional progress %) for live upload UI."""
+    82→    82→    try:
+    83→    83→        vals = {"stage": stage}
+    84→    84→        if progress is not None:
+    85→    85→            vals["progress"] = progress
+    86→    86→        _update_document(cur, conn, doc_id, vals)
+    87→    87→    except Exception:
+    88→    88→        try:
+    89→    89→            conn.rollback()
+    90→    90→        except Exception:
+    91→    91→            pass
+    92→    92→def _link_default_collection(cur, conn, doc_id: int):
+    93→    93→    # 18B8: no-op — new uploads must stay at root (collection_id NULL).
+    94→    94→    # This prototype-era helper silently assigned every processed file
+    95→    95→    # to the lowest-id collection, which mis-tagged uploads.
+    96→    96→    return
+    97→    97→
+    98→    98→
+    99→    99→# ---------------- Chunking (512 tokens / 128 overlap, word-approx) ----------------
+   100→   100→
+   101→   101→def _hard_split(sentence: str, max_words: int) -> list[str]:
+   102→   102→    words = sentence.split()
+   103→   103→    return [" ".join(words[i:i + max_words]) for i in range(0, len(words), max_words)]
+   104→   104→
+   105→   105→def chunk_text(text: str, max_words: int, overlap_words: int) -> list[str]:
+   106→   106→    """Sentence-aware chunking. 390 words ~ 512 tokens, 96 words ~ 128 tokens."""
+   107→   107→    text = re.sub(r"\n{3,}", "\n\n", (text or "").strip())
+   108→   108→    if not text:
+   109→   109→        return []
+   110→   110→    sentences = re.split(r"(?<=[.!?\u061F\u06D4])\s+|\n+", text)
+   111→   111→    sentences = [s.strip() for s in sentences if s and s.strip()]
+   112→   112→
+   113→   113→    chunks, current, current_words = [], [], 0
+   114→   114→    for sent in sentences:
+   115→   115→        w = len(sent.split())
+   116→   116→        if w > max_words:
+   117→   117→            if current:
+   118→   118→                chunks.append(" ".join(current))
+   119→   119→                current, current_words = [], 0
+   120→   120→            chunks.extend(_hard_split(sent, max_words))
+   121→   121→            continue
+   122→   122→        if current and current_words + w > max_words:
+   123→   123→            chunks.append(" ".join(current))
+   124→   124→            overlap, kept = [], 0
+   125→   125→            for s in reversed(current):
+   126→   126→                sw = len(s.split())
+   127→   127→                if kept + sw > overlap_words:
+   128→   128→                    break
+   129→   129→                overlap.insert(0, s)
+   130→   130→                kept += sw
+   131→   131→            current, current_words = overlap, kept
+   132→   132→        current.append(sent)
+   133→   133→        current_words += w
+   134→   134→    if current:
+   135→   135→        chunks.append(" ".join(current))
+   136→   136→    return [c for c in chunks if len(c) >= 20] or [text.strip()]
+   137→   137→
+   138→   138→
+   139→   139→
+   140→   140→# ---------------- Language detection ----------------
+   141→   141→
+   142→   142→def detect_language(text: str) -> str:
+   143→   143→    """'ar' if Arabic characters dominate, else 'en'."""
+   144→   144→    sample = (text or "")[:2000]
+   145→   145→    arabic = len(re.findall(r"[\u0600-\u06FF]", sample))
+   146→   146→    latin = len(re.findall(r"[a-zA-Z]", sample))
+   147→   147→    return "ar" if arabic > latin else "en"
+   148→   148→
+   149→   149→# ---------------- Text extraction ----------------
+   150→   150→
+   151→   151→def extract_pdf_pages(file_bytes: bytes, on_ocr=None) -> list[dict]:
+   152→   152→    """Return [{'page': int, 'text': str}, ...] — text layer, else per-page OCR."""
+   153→   153→    import fitz  # PyMuPDF
+   154→   154→    doc = fitz.open(stream=file_bytes, filetype="pdf")
+   155→   155→    pages = [{"page": i + 1, "text": page.get_text().strip()} for i, page in enumerate(doc)]
+   156→   156→    if any(p["text"] for p in pages):
+   157→   157→        doc.close()
+   158→   158→        return [p for p in pages if p["text"]]
+   159→   159→    # Scanned PDF -> render pages and OCR (cap at 30 pages to bound CPU)
+   160→   160→    from app.services.ocr_service import extract_text_from_image
+   161→   161→    if on_ocr:
+   162→   162→        on_ocr()
+   163→   163→    out = []
+   164→   164→    for i in range(min(len(doc), 30)):
+   165→   165→        pix = doc[i].get_pixmap(dpi=150)
+   166→   166→        t = extract_text_from_image(pix.tobytes("png"))
+   167→   167→        if t.strip():
+   168→   168→            out.append({"page": i + 1, "text": t.strip()})
+   169→   169→    doc.close()
+   170→   170→    return out
+   171→   171→
+   172→   172→def convert_office_to_pdf(file_bytes: bytes, filename: str) -> bytes | None:
+   173→   173→    """Step 28: LibreOffice headless Office->PDF conversion (fail-open).
+   174→   174→
+   175→   175→    Returns the PDF bytes, or None when conversion is impossible (missing
+   176→   176→    soffice, corrupt file, timeout). Ingest always continues either way."""
+   177→   177→    import subprocess
+   178→   178→    import tempfile
+   179→   179→    try:
+   180→   180→        with tempfile.TemporaryDirectory() as td:
+   181→   181→            src = os.path.join(td, os.path.basename(filename))
+   182→   182→            with open(src, "wb") as fh:
+   183→   183→                fh.write(file_bytes)
+   184→   184→            subprocess.run(
+   185→   185→                ["soffice", "--headless", "--norestore", "--nolockcheck",
+   186→   186→                 "-env:UserInstallation=file:///tmp/lo_profile_seekra",
+   187→   187→                 "--convert-to", "pdf", "--outdir", td, src],
+   188→   188→                check=True, timeout=180, capture_output=True)
+   189→   189→            pdf_path = os.path.splitext(src)[0] + ".pdf"
+   190→   190→            with open(pdf_path, "rb") as fh:
+   191→   191→                return fh.read()
+   192→   192→    except Exception as exc:
+   193→   193→        print(f"Office->PDF conversion failed for {filename}: {exc}")
+   194→   194→        return None
+   195→   195→
+   196→   196→
+   197→   197→def extract_docx(file_bytes: bytes) -> str:
+   198→   198→    from docx import Document as DocxDocument
+   199→   199→    d = DocxDocument(io.BytesIO(file_bytes))
+   200→   200→    parts = [p.text for p in d.paragraphs if p.text.strip()]
+   201→   201→    for table in d.tables:
+   202→   202→        for row in table.rows:
+   203→   203→            parts.append(" | ".join(cell.text for cell in row.cells))
+   204→   204→    return "\n".join(parts)
+   205→   205→
+   206→   206→
+   207→   207→
+   208→   208→# ---------------- Visual search indexing helpers ----------------
+   209→   209→
+   210→   210→def _store_visual_assets(cur, conn, doc_id: int, filename: str, file_bytes: bytes) -> int:
+   211→   211→    """Extract, analyze, thumbnail, and store visual assets for one document."""
+   212→   212→    import json
+   213→   213→    from app.services.minio_client import upload_file
+   214→   214→    from app.services.visual_ai import (
+   215→   215→        analyze_visual_asset,
+   216→   216→        extract_visual_candidates,
+   217→   217→        is_visual_candidate,
+   218→   218→        release_visual_models,
+   219→   219→    )
+   220→   220→
+   221→   221→    if not is_visual_candidate(filename):
+   222→   222→        return 0
+   223→   223→
+   224→   224→    cur.execute("DELETE FROM visual_assets WHERE document_id = %s", (doc_id,))
+   225→   225→    candidates = extract_visual_candidates(filename, file_bytes)
+   226→   226→    stored = 0
+   227→   227→
+   228→   228→    for index, candidate in enumerate(candidates, start=1):
+   229→   229→        analyzed = analyze_visual_asset(
+   230→   230→            candidate["image"],
+   231→   231→            candidate["asset_type"],
+   232→   232→            page_number=candidate.get("page_number"),
+   233→   233→            start_time=candidate.get("start_time"),
+   234→   234→            end_time=candidate.get("end_time"),
+   235→   235→            ocr_text=candidate.get("ocr_text"),
+   236→   236→        )
+   237→   237→        # Free the raw candidate before the next page/frame is analyzed.
+   238→   238→        candidate["image"] = None
+   239→   239→        thumbnail_path = f"visual/{doc_id}/{index}.jpg"
+   240→   240→        upload_file(thumbnail_path, analyzed["thumbnail_bytes"], "image/jpeg")
+   241→   241→        embedding = analyzed["embedding"]
+   242→   242→        cur.execute(
+   243→   243→            """
+   244→   244→            INSERT INTO visual_assets
+   245→   245→            (document_id, asset_type, page_number, start_time, end_time,
+   246→   246→             width, height, ocr_text, thumbnail_path, embedding)
+   247→   247→            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CAST(%s AS vector))
+   248→   248→            RETURNING id
+   249→   249→            """,
+   250→   250→            (
+   251→   251→                doc_id,
+   252→   252→                analyzed["asset_type"],
+   253→   253→                analyzed["page_number"],
+   254→   254→                analyzed["start_time"],
+   255→   255→                analyzed["end_time"],
+   256→   256→                analyzed["width"],
+   257→   257→                analyzed["height"],
+   258→   258→                analyzed["ocr_text"],
+   259→   259→                thumbnail_path,
+   260→   260→                str(embedding) if embedding is not None else None,
+   261→   261→            ),
+   262→   262→        )
+   263→   263→        asset_id = cur.fetchone()[0]
+   264→   264→        for label in analyzed["labels"]:
+   265→   265→            cur.execute(
+   266→   266→                """
+   267→   267→                INSERT INTO visual_labels (asset_id, label, confidence, bbox)
+   268→   268→                VALUES (%s, %s, %s, CAST(%s AS jsonb))
+   269→   269→                """,
+   270→   270→                (
+   271→   271→                    asset_id,
+   272→   272→                    label["label"],
+   273→   273→                    label["confidence"],
+   274→   274→                    json.dumps(label.get("bbox") or []),
+   275→   275→                ),
+   276→   276→            )
+   277→   277→        stored += 1
+   278→   278→
+   279→   279→    if stored:
+   280→   280→        cur.execute("SELECT created_by FROM documents WHERE id = %s", (doc_id,))
+   281→   281→        owner = cur.fetchone()
+   282→   282→        cur.execute(
+   283→   283→            "INSERT INTO audit_logs (user_id, action, details, ip_address) VALUES (%s, %s, %s, %s)",
+   284→   284→            (
+   285→   285→                owner[0] if owner else None,
+   286→   286→                "CONTENT_VISUAL_INDEXED",
+   287→   287→                f"Indexed {stored} visual asset(s) for document {doc_id}",
+   288→   288→                None,
+   289→   289→            ),
+   290→   290→        )
+   291→   291→    conn.commit()
+   292→   292→    release_visual_models()
+   293→   293→    return stored
+   294→   294→
+   295→   295→
+   296→   296→# ---------------- Main task ----------------
+   297→   297→
+   298→   298→@celery_app.task(bind=True, max_retries=1)
+   299→   299→def process_document_task(self, doc_id: int, object_name: str, filename: str):
+   300→   300→    from app.services.ocr_service import extract_text_from_image
+   301→   301→    from app.services.stt_service import transcribe_audio_segments
+   302→   302→    from app.services.embedding import get_embedding
+   303→   303→    from app.services.llm_gateway import llm_gateway
+   304→   304→    from app.services.minio_client import minio_client
+   305→   305→
+   306→   306→    conn = _connect()
+   307→   307→    cur = conn.cursor()
+   308→   308→    segments = []
+   309→   309→    pages = None
+   310→   310→    content_text = ""
+   311→   311→
+   312→   312→    try:
+   313→   313→        _set_status(cur, conn, doc_id, "processing")
+   314→   314→        _set_stage(cur, conn, doc_id, "extracting", 5)
+   315→   315→
+   316→   316→        response = minio_client.get_object(settings.minio_bucket_name, object_name)
+   317→   317→        file_bytes = response.read()
+   318→   318→        response.close()
+   319→   319→        response.release_conn()
+   320→   320→
+   321→   321→        lower = filename.lower()
+   322→   322→        category = "file"
+   323→   323→
+   324→   324→        if any(lower.endswith(e) for e in IMAGE_EXTS):
+   325→   325→            _set_stage(cur, conn, doc_id, "ocr", 15)
+   326→   326→            content_text = extract_text_from_image(file_bytes)
+   327→   327→            category = "image"
+   328→   328→            _set_stage(cur, conn, doc_id, "ocr", 55)
+   329→   329→        elif any(lower.endswith(e) for e in AUDIO_EXTS + VIDEO_EXTS):
+   330→   330→            _set_stage(cur, conn, doc_id, "transcribing", 15)
+   331→   331→            segments = transcribe_audio_segments(file_bytes, filename)
+   332→   332→            content_text = " ".join(s["text"] for s in segments).strip()
+   333→   333→            category = "audio" if any(lower.endswith(e) for e in AUDIO_EXTS) else "video"
+   334→   334→            _set_stage(cur, conn, doc_id, "transcribing", 60)
+   335→   335→        elif lower.endswith(".pdf"):
+   336→   336→            _set_stage(cur, conn, doc_id, "extracting", 10)
+   337→   337→            pages = extract_pdf_pages(file_bytes, on_ocr=lambda: _set_stage(cur, conn, doc_id, "ocr", 20))
+   338→   338→            content_text = "\n".join(p["text"] for p in pages)
+   339→   339→            category = "pdf"
+   340→   340→            _set_stage(cur, conn, doc_id, "extracting", 55)
+   341→   341→        elif lower.endswith(".docx"):
+   342→   342→            content_text = extract_docx(file_bytes)
+   343→   343→            category = "document"
+   344→   344→        elif lower.endswith(".doc"):
+   345→   345→            content_text = ""  # legacy binary .doc unsupported
+   346→   346→            category = "document"
+   347→   347→        elif any(lower.endswith(e) for e in ['.xls', '.xlsx']):
+   348→   348→            try:
+   349→   349→                import pandas as pd
+   350→   350→                content_text = pd.read_excel(io.BytesIO(file_bytes)).to_string()
+   351→   351→            except Exception:
+   352→   352→                content_text = ""
+   353→   353→            category = "spreadsheet"
+   354→   354→        elif any(lower.endswith(e) for e in ['.ppt', '.pptx']):
+   355→   355→            try:
+   356→   356→                from pptx import Presentation
+   357→   357→                prs = Presentation(io.BytesIO(file_bytes))
+   358→   358→                texts = []
+   359→   359→                slide_pages = []
+   360→   360→                for si, slide in enumerate(prs.slides, start=1):
+   361→   361→                    slide_texts = [shape.text for shape in slide.shapes if hasattr(shape, "text")]
+   362→   362→                    texts.extend(slide_texts)
+   363→   363→                    st = "\n".join(t for t in slide_texts if t).strip()
+   364→   364→                    if st:
+   365→   365→                        slide_pages.append({"page": si, "text": st})
+   366→   366→                content_text = "\n".join(texts)
+   367→   367→                if slide_pages:
+   368→   368→                    pages = slide_pages  # chunks get slide numbers as page_number
+   369→   369→            except Exception:
+   370→   370→                content_text = ""
+   371→   371→            category = "presentation"
+   372→   372→        else:
+   373→   373→            content_text = file_bytes.decode("utf-8", errors="ignore")
+   374→   374→            category = "text"
+   375→   375→
+   376→   376→        # Step 28: build a PDF rendition for Office documents so the viewer
+   377→   377→        # can display them with the existing PDF.js path. Stored by naming
+   378→   378→        # convention (<object>.preview.pdf) - no schema change required.
+   379→   379→        if any(lower.endswith(e) for e in OFFICE_EXTS):
+   380→   380→            try:
+   381→   381→                _set_stage(cur, conn, doc_id, "converting", 58)
+   382→   382→                pdf_bytes = convert_office_to_pdf(file_bytes, filename)
+   383→   383→                if pdf_bytes:
+   384→   384→                    from app.services.minio_client import upload_file as _upload
+   385→   385→                    _upload(object_name + ".preview.pdf", pdf_bytes, "application/pdf")
+   386→   386→                    if pages is None:
+   387→   387→                        # docx/xlsx had no page numbers; the rendition provides them
+   388→   388→                        pages = extract_pdf_pages(pdf_bytes)
+   389→   389→                        if pages and not content_text:
+   390→   390→                            content_text = "\n".join(p["text"] for p in pages)
+   391→   391→            except Exception as exc:
+   392→   392→                try:
+   393→   393→                    conn.rollback()
+   394→   394→                except Exception:
+   395→   395→                    pass
+   396→   396→                print(f"Document {doc_id}: PDF rendition skipped: {exc}")
+   397→   397→
+   398→   398→        content_text = (content_text or "").replace("\x00", " ").strip()
+   399→   399→
+   400→   400→        # Visual assets are indexed before the no-text early return so image-only
+   401→   401→        # documents remain searchable even when OCR finds no text.
+   402→   402→        visual_count = 0
+   403→   403→        try:
+   404→   404→            _set_stage(cur, conn, doc_id, "visual", 60)
+   405→   405→            visual_count = _store_visual_assets(cur, conn, doc_id, filename, file_bytes)
+   406→   406→        except Exception as visual_exc:
+   407→   407→            conn.rollback()
+   408→   408→            release_visual_models()
+   409→   409→            print(f"Document {doc_id}: visual indexing skipped: {visual_exc}")
+   410→   410→
+   411→   411→        if not content_text and not segments:
+   412→   412→            print(f"Document {doc_id}: no text extracted")
+   413→   413→            _update_document(cur, conn, doc_id, {
+   414→   414→                "content_text": "", "content_type": category,
+   415→   415→                "mime_type": category, "summary": "", "status": "completed",
+   416→   416→                "stage": "ready", "progress": 100,
+   417→   417→                "pii_flagged": False, "pii_count": 0, "pii_risk": "none"})
+   418→   418→            _link_default_collection(cur, conn, doc_id)
+   419→   419→            return
+   420→   420→
+   421→   421→        _set_stage(cur, conn, doc_id, "chunking", 65)
+   422→   422→
+   423→   423→        # ---- Chunk (page-aware) + embed with bge-m3 (1024-dim) ----
+   424→   424→        chunk_items = []  # {"text": str, "page": int | None}
+   425→   425→        if pages:
+   426→   426→            for p in pages:
+   427→   427→                for c in chunk_text(_nfkc(p["text"].replace("\x00", " ")), settings.chunk_max_words, settings.chunk_overlap_words):
+   428→   428→                    chunk_items.append({"text": c, "page": p["page"]})
+   429→   429→        else:
+   430→   430→            for c in chunk_text(content_text, settings.chunk_max_words, settings.chunk_overlap_words):
+   431→   431→                chunk_items.append({"text": c, "page": None})
+   432→   432→        pii_chunk_findings = []
+   433→   433→        for idx, item in enumerate(chunk_items):
+   434→   434→            for finding in detect_pii(item["text"]):
+   435→   435→                finding["chunk_index"] = idx
+   436→   436→                finding["page_number"] = item.get("page")
+   437→   437→                pii_chunk_findings.append(finding)
+   438→   438→
+   439→   439→        print(f"Document {doc_id}: {len(chunk_items)} chunks, {len(segments)} A/V segments")
+   440→   440→
+   441→   441→        cur.execute("DELETE FROM document_chunks WHERE document_id = %s", (doc_id,))
+   442→   442→        cur.execute("DELETE FROM document_segments WHERE document_id = %s", (doc_id,))
+   443→   443→        cur.execute("DELETE FROM pii_findings WHERE document_id = %s", (doc_id,))
+   444→   444→
+   445→   445→        pii_total = len(pii_chunk_findings)
+   446→   446→        pii_risk = highest_risk(finding["risk_level"] for finding in pii_chunk_findings)
+   447→   447→        for finding in pii_chunk_findings:
+   448→   448→            cur.execute(
+   449→   449→                "INSERT INTO pii_findings (document_id, chunk_index, page_number, pii_type, risk_level, match_count, masked_sample) "
+   450→   450→                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+   451→   451→                (doc_id, finding["chunk_index"], finding["page_number"], finding["pii_type"],
+   452→   452→                 finding["risk_level"], 1, finding["masked_sample"]))
+   453→   453→        if pii_total:
+   454→   454→            cur.execute("SELECT created_by FROM documents WHERE id = %s", (doc_id,))
+   455→   455→            owner = cur.fetchone()
+   456→   456→            cur.execute(
+   457→   457→                "INSERT INTO audit_logs (user_id, action, details, ip_address) VALUES (%s, %s, %s, %s)",
+   458→   458→                (owner[0] if owner else None, "CONTENT_PII_DETECTED",
+   459→   459→                 f"Detected {pii_total} PII finding(s) in document {doc_id}; max risk: {pii_risk}", None))
+   460→   460→        conn.commit()
+   461→   461→
+   462→   462→        chunk_embeddings = []
+   463→   463→        for idx, item in enumerate(chunk_items):
+   464→   464→            emb = get_embedding(item["text"])
+   465→   465→            chunk_embeddings.append(emb)
+   466→   466→            cur.execute(
+   467→   467→                "INSERT INTO document_chunks (document_id, chunk_text, chunk_index, page_number, embedding) "
+   468→   468→                "VALUES (%s, %s, %s, %s, %s::vector)",
+   469→   469→                (doc_id, item["text"], idx, item["page"], str(emb)))
+   470→   470→            if (idx + 1) % 5 == 0 or idx + 1 == len(chunk_items):
+   471→   471→                conn.commit()
+   472→   472→                _set_stage(cur, conn, doc_id, "embedding", 65 + int(20 * (idx + 1) / max(1, len(chunk_items))))
+   473→   473→                print(f"Document {doc_id}: embedded chunk {idx + 1}/{len(chunk_items)}")
+   474→   474→
+   475→   475→        # ---- Timestamped segments (audio/video) ----
+   476→   476→        for i, seg in enumerate(segments):
+   477→   477→            seg["text"] = (seg["text"] or "").replace("\x00", " ")
+   478→   478→            emb = get_embedding(seg["text"])
+   479→   479→            cur.execute(
+   480→   480→                "INSERT INTO document_segments (document_id, segment_text, start_time, end_time, embedding) "
+   481→   481→                "VALUES (%s, %s, %s, %s, %s::vector)",
+   482→   482→                (doc_id, seg["text"], seg["start"], seg["end"], str(emb)))
+   483→   483→            if (i + 1) % 20 == 0 or i + 1 == len(segments):
+   484→   484→                conn.commit()
+   485→   485→                _set_stage(cur, conn, doc_id, "embedding", 85 + int(10 * (i + 1) / max(1, len(segments))))
+   486→   486→                print(f"Document {doc_id}: embedded segment {i + 1}/{len(segments)}")
+   487→   487→
+   488→   488→        _set_stage(cur, conn, doc_id, "summarizing", 95)
+   489→   489→
+   490→   490→        # ---- Summary via Qwen (graceful fallback) ----
+   491→   491→        try:
+   492→   492→            doc_lang = detect_language(content_text)
+   493→   493→            # Full-coverage summary input: opening + closing, not just the first
+   494→   494→            # 3000 chars (same quality bar as on-demand summaries, Step 17A.2)
+   495→   495→            summary_input = content_text if len(content_text) <= 4000 else (
+   496→   496→                content_text[:2500] + "\n[...]\n" + content_text[-1500:]
+   497→   497→            )
+   498→   498→            summary = asyncio.run(llm_gateway.summarize(summary_input, doc_lang))
+   499→   499→        except Exception as e:
+   500→   500→            print(f"AI summary failed (fallback to excerpt): {e}")
+   501→   501→            summary = content_text[:500] + ("..." if len(content_text) > 500 else "")
+   502→   502→
+   503→   503→        # ---- Update document row ----
+   504→   504→        _update_document(cur, conn, doc_id, {
+   505→   505→            "content_text": content_text, "content_type": category,
+   506→   506→            "mime_type": category, "summary": summary, "language": doc_lang, "status": "completed",
+   507→   507→            "stage": "ready", "progress": 100,
+   508→   508→            "pii_flagged": pii_total > 0, "pii_count": pii_total, "pii_risk": pii_risk})
+   509→   509→
+   510→   510→        # Optional: doc-level mean embedding, only if legacy vector column is 1024-dim
+   511→   511→        try:
+   512→   512→            if "embedding" in _table_columns(cur, "documents") and chunk_embeddings:
+   513→   513→                dim = _vector_dim(cur, "documents", "embedding")
+   514→   514→                if dim == len(chunk_embeddings[0]):
+   515→   515→                    mean_emb = [sum(v) / len(v) for v in zip(*chunk_embeddings)]
+   516→   516→                    norm = math.sqrt(sum(x * x for x in mean_emb)) or 1.0
+   517→   517→                    mean_emb = [x / norm for x in mean_emb]
+   518→   518→                    cur.execute("UPDATE documents SET embedding = %s::vector WHERE id = %s",
+   519→   519→                                (str(mean_emb), doc_id))
+   520→   520→                    conn.commit()
+   521→   521→        except Exception as e:
+   522→   522→            conn.rollback()
+   523→   523→            print(f"Doc-level embedding skipped: {e}")
+   524→   524→
+   525→   525→        _link_default_collection(cur, conn, doc_id)
+   526→   526→        print(f"Document {doc_id} DONE: {len(chunk_items)} chunks, {len(segments)} segments, {len(content_text)} chars")
+   527→   527→
+   528→   528→    except Exception as exc:
+   529→   529→        conn.rollback()
+   530→   530→        print(f"Document {doc_id} FAILED: {exc}")
+   531→   531→        _set_status(cur, conn, doc_id, "failed")
+   532→   532→        _set_stage(cur, conn, doc_id, "failed")
+   533→   533→        raise self.retry(exc=exc, countdown=60)
+   534→   534→    finally:
+   535→   535→        cur.close()
+   536→   536→        conn.close()
+   537→   537→
+   538→   538→
+   539→   539→# ---------------- Step 12B: existing-document PII rescan ----------------
+   540→   540→
+   541→   541→@celery_app.task(bind=True, max_retries=1, name="app.workers.celery_tasks.rescan_pii_task")
+   542→   542→def rescan_pii_task(self):
+   543→   543→    """Rescan indexed chunks and rebuild masked PII findings for all documents."""
+   544→   544→    conn = _connect()
+   545→   545→    cur = conn.cursor()
+   546→   546→    scanned = 0
+   547→   547→    flagged_documents = 0
+   548→   548→    total_findings = 0
+   549→   549→    try:
+   550→   550→        cur.execute("SELECT id, created_by FROM documents ORDER BY id")
+   551→   551→        documents = cur.fetchall()
+   552→   552→        for doc_id, owner_id in documents:
+   553→   553→            cur.execute(
+   554→   554→                "SELECT chunk_index, page_number, chunk_text FROM document_chunks WHERE document_id = %s ORDER BY chunk_index",
+   555→   555→                (doc_id,))
+   556→   556→            rows = cur.fetchall()
+   557→   557→            findings = []
+   558→   558→            for chunk_index, page_number, chunk_text in rows:
+   559→   559→                for finding in detect_pii(chunk_text):
+   560→   560→                    finding["chunk_index"] = chunk_index
+   561→   561→                    finding["page_number"] = page_number
+   562→   562→                    findings.append(finding)
+   563→   563→
+   564→   564→            cur.execute("DELETE FROM pii_findings WHERE document_id = %s", (doc_id,))
+   565→   565→            doc_findings = len(findings)
+   566→   566→            doc_risk = highest_risk(finding["risk_level"] for finding in findings)
+   567→   567→            for finding in findings:
+   568→   568→                cur.execute(
+   569→   569→                    "INSERT INTO pii_findings (document_id, chunk_index, page_number, pii_type, risk_level, match_count, masked_sample) "
+   570→   570→                    "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+   571→   571→                    (doc_id, finding["chunk_index"], finding["page_number"], finding["pii_type"],
+   572→   572→                     finding["risk_level"], 1, finding["masked_sample"]))
+   573→   573→            cur.execute(
+   574→   574→                "UPDATE documents SET pii_flagged = %s, pii_count = %s, pii_risk = %s, updated_at = NOW() WHERE id = %s",
+   575→   575→                (doc_findings > 0, doc_findings, doc_risk, doc_id))
+   576→   576→            if doc_findings:
+   577→   577→                cur.execute(
+   578→   578→                    "INSERT INTO audit_logs (user_id, action, details, ip_address) VALUES (%s, %s, %s, %s)",
+   579→   579→                    (owner_id, "CONTENT_PII_DETECTED",
+   580→   580→                     f"Rescan detected {doc_findings} PII finding(s) in document {doc_id}; max risk: {doc_risk}", None))
+   581→   581→            conn.commit()
+   582→   582→            scanned += 1
+   583→   583→            if doc_findings:
+   584→   584→                flagged_documents += 1
+   585→   585→                total_findings += doc_findings
+   586→   586→        return {
+   587→   587→            "scanned_documents": scanned,
+   588→   588→            "flagged_documents": flagged_documents,
+   589→   589→            "total_findings": total_findings,
+   590→   590→        }
+   591→   591→    except Exception as exc:
+   592→   592→        conn.rollback()
+   593→   593→        print(f"PII rescan FAILED: {exc}")
+   594→   594→        raise self.retry(exc=exc, countdown=60)
+   595→   595→    finally:
+   596→   596→        cur.close()
+   597→   597→        conn.close()
+   598→   598→
+   599→   599→
+   600→   600→# ---------------- Step 13: existing-document visual rescan ----------------
+   601→   601→
+   602→   602→@celery_app.task(bind=True, max_retries=1, name="app.workers.celery_tasks.rescan_visual_task")
+   603→   603→def rescan_visual_task(self):
+   604→   604→    """Rebuild visual assets for all supported existing documents."""
+   605→   605→    from app.services.minio_client import minio_client
+   606→   606→    from app.services.visual_ai import is_visual_candidate
+   607→   607→
+   608→   608→    conn = _connect()
+   609→   609→    cur = conn.cursor()
+   610→   610→    scanned = 0
+   611→   611→    indexed = 0
+   612→   612→    assets = 0
+   613→   613→    errors = []
+   614→   614→    try:
+   615→   615→        cur.execute(
+   616→   616→            "SELECT id, filename, COALESCE(minio_path, original_path) FROM documents ORDER BY id"
+   617→   617→        )
+   618→   618→        documents = cur.fetchall()
+   619→   619→        for doc_id, filename, object_name in documents:
+   620→   620→            if not object_name or not is_visual_candidate(filename or ""):
+   621→   621→                continue
+   622→   622→            try:
+   623→   623→                response = minio_client.get_object(settings.minio_bucket_name, object_name)
+   624→   624→                file_bytes = response.read()
+   625→   625→                response.close()
+   626→   626→                response.release_conn()
+   627→   627→                count = _store_visual_assets(cur, conn, doc_id, filename, file_bytes)
+   628→   628→                scanned += 1
+   629→   629→                assets += count
+   630→   630→                if count:
+   631→   631→                    indexed += 1
+   632→   632→            except Exception as doc_exc:
+   633→   633→                conn.rollback()
+   634→   634→                release_visual_models()
+   635→   635→                errors.append(f"document {doc_id}: {doc_exc}")
+   636→   636→                print(f"Visual rescan skipped document {doc_id}: {doc_exc}")
+   637→   637→        return {
+   638→   638→            "scanned_documents": scanned,
+   639→   639→            "visual_documents": indexed,
+   640→   640→            "visual_assets": assets,
+   641→   641→            "errors": errors,
+   642→   642→        }
+   643→   643→    except Exception as exc:
+   644→   644→        conn.rollback()
+   645→   645→        print(f"Visual rescan FAILED: {exc}")
+   646→   646→        raise self.retry(exc=exc, countdown=60)
+   647→   647→    finally:
+   648→   648→        cur.close()
+   649→   649→        conn.close()
+   650→   650→

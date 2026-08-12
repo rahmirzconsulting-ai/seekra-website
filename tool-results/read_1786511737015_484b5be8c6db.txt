@@ -1,0 +1,660 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useState, type ComponentType } from "react";
+     4→import { useI18n } from "@/i18n/i18n-context";
+     5→import { AppLayout } from "@/components/app-layout";
+     6→import { ProtectedRoute } from "@/components/protected-route";
+     7→import { getFiles, downloadFile, deleteFile, bulkFiles, getCollections } from "@/lib/api";
+     8→import { DocumentPreviewModal } from "@/components/document-preview-modal";
+     9→import { PiiBadge } from "@/components/pii-badge";
+    10→import { useRouter } from "next/navigation";
+    11→import { useAuth } from "@/lib/auth-context";
+    12→
+    13→import type { DocumentResponse } from "@/lib/api";
+    14→import {
+    15→  FileText,
+    16→  Image,
+    17→  Music,
+    18→  Video,
+    19→  Download,
+    20→  Eye,
+    21→  Trash2,
+    22→  Loader2,
+    23→  Search,
+    24→  Calendar,
+    25→  HardDrive,
+    26→  FolderInput,
+    27→  Lock,
+    28→  X,
+    29→} from "lucide-react";
+    30→
+    31→// 18B6: the file-type icon doubles as a real thumbnail for images and a
+    32→// click-through to the viewer for every type.
+    33→function FileThumb({
+    34→  file,
+    35→  Icon,
+    36→  onOpen,
+    37→}: {
+    38→  file: DocumentResponse;
+    39→  Icon: ComponentType<{ className?: string }>;
+    40→  onOpen: () => void;
+    41→}) {
+    42→  const [src, setSrc] = useState<string | null>(null);
+    43→
+    44→  useEffect(() => {
+    45→    if (!file.mime_type || !file.mime_type.startsWith("image/")) return;
+    46→    let url: string | null = null;
+    47→    let cancelled = false;
+    48→    downloadFile(file.id, file.filename, false)
+    49→      .then((blob) => {
+    50→        if (cancelled) return;
+    51→        url = URL.createObjectURL(blob);
+    52→        setSrc(url);
+    53→      })
+    54→      .catch(() => undefined);
+    55→    return () => {
+    56→      cancelled = true;
+    57→      if (url) URL.revokeObjectURL(url);
+    58→    };
+    59→  }, [file.id, file.filename, file.mime_type]);
+    60→
+    61→  return (
+    62→    <button
+    63→      onClick={onOpen}
+    64→      title={file.filename}
+    65→      className="shrink-0 rounded-lg overflow-hidden hover:ring-2 hover:ring-primary/50 transition-all cursor-pointer"
+    66→    >
+    67→      {src ? (
+    68→        // eslint-disable-next-line @next/next/no-img-element
+    69→        <img src={src} alt={file.filename} className="w-8 h-8 object-cover" />
+    70→      ) : (
+    71→        <div className="p-1.5 rounded-lg bg-surface">
+    72→          <Icon className="w-4 h-4 text-primary" />
+    73→        </div>
+    74→      )}
+    75→    </button>
+    76→  );
+    77→}
+    78→
+    79→export default function FilesPage() {
+    80→  const { t } = useI18n();
+    81→  const tf = (key: string, fallback: string) => {
+    82→    const value = t(key);
+    83→    return value && value !== key ? value : fallback;
+    84→  };
+    85→  const collectionName = (id: number | null | undefined) =>
+    86→    id == null ? "" : collections.find((c) => c.id === id)?.name || "";
+    87→  const { canUpload } = useAuth();
+    88→  const [files, setFiles] = useState<DocumentResponse[]>([]);
+    89→  const [loading, setLoading] = useState(true);
+    90→  const [searchQuery, setSearchQuery] = useState("");
+    91→  const router = useRouter();
+    92→  const [deleteTarget, setDeleteTarget] = useState<{ id: number; filename: string } | null>(null);
+    93→  const [deleting, setDeleting] = useState(false);
+    94→  const [deleteError, setDeleteError] = useState("");
+    95→  const [previewDoc, setPreviewDoc] = useState<DocumentResponse | null>(null);
+    96→  const [busyAction, setBusyAction] = useState<string | null>(null);
+    97→  // 18A — bulk operations
+    98→  const [selected, setSelected] = useState<Set<number>>(new Set());
+    99→  const [bulkBusy, setBulkBusy] = useState(false);
+   100→  const [bulkError, setBulkError] = useState("");
+   101→  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+   102→  const [moveOpen, setMoveOpen] = useState(false);
+   103→  const [collections, setCollections] = useState<{ id: number; name: string }[]>([]);
+   104→  const [moveTarget, setMoveTarget] = useState<number | null>(null);
+   105→
+   106→  const toggleSelected = (id: number) => {
+   107→    setSelected((prev) => {
+   108→      const next = new Set(prev);
+   109→      if (next.has(id)) next.delete(id); else next.add(id);
+   110→      return next;
+   111→    });
+   112→  };
+   113→
+   114→  const clearSelection = () => {
+   115→    setSelected(new Set());
+   116→    setBulkError("");
+   117→  };
+   118→
+   119→  const openMoveDialog = async () => {
+   120→    setBulkError("");
+   121→    setMoveTarget(null);
+   122→    try {
+   123→      const cols = await getCollections();
+   124→      setCollections(cols.map((c) => ({ id: c.id, name: c.name })));
+   125→    } catch {
+   126→      setCollections([]);
+   127→    }
+   128→    setMoveOpen(true);
+   129→  };
+   130→
+   131→  const handleBulkMove = async () => {
+   132→    setBulkBusy(true);
+   133→    setBulkError("");
+   134→    try {
+   135→      await bulkFiles({ action: "move", ids: Array.from(selected), collection_id: moveTarget });
+   136→      setMoveOpen(false);
+   137→      clearSelection();
+   138→      await fetchFiles();
+   139→    } catch (err: unknown) {
+   140→      setBulkError(err instanceof Error ? err.message : t("files.bulkFailed"));
+   141→    } finally {
+   142→      setBulkBusy(false);
+   143→    }
+   144→  };
+   145→
+   146→  const handleBulkDelete = async () => {
+   147→    setBulkBusy(true);
+   148→    setBulkError("");
+   149→    try {
+   150→      const result = await bulkFiles({ action: "delete", ids: Array.from(selected) });
+   151→      const deletedIds = new Set((result.deleted || []).map((d: { id: number }) => d.id));
+   152→      setFiles((prev) => prev.filter((f) => !deletedIds.has(f.id)));
+   153→      setBulkDeleteOpen(false);
+   154→      clearSelection();
+   155→      if ((result.failed || []).length > 0) {
+   156→        setBulkError(`${(result.failed || []).length} ${t("files.bulkSomeFailed")}`);
+   157→      }
+   158→    } catch (err: unknown) {
+   159→      setBulkError(err instanceof Error ? err.message : t("files.bulkFailed"));
+   160→    } finally {
+   161→      setBulkBusy(false);
+   162→    }
+   163→  };
+   164→
+   165→
+   166→  useEffect(() => {
+   167→    fetchFiles();
+   168→    getCollections()
+   169→      .then((cols) => setCollections(cols.map((c) => ({ id: c.id, name: c.name }))))
+   170→      .catch(() => setCollections([]));
+   171→  }, []);
+   172→
+   173→  const fetchFiles = async () => {
+   174→    try {
+   175→      const data = await getFiles();
+   176→      setFiles(data);
+   177→    } catch (err) {
+   178→      console.error("Failed to fetch files:", err);
+   179→    } finally {
+   180→      setLoading(false);
+   181→    }
+   182→  };
+   183→
+   184→  const handleDownload = async (id: number, filename: string) => {
+   185→    setBusyAction(`dl-${id}`);
+   186→    try {
+   187→      const blob = await downloadFile(id, filename, false);
+   188→      const url = URL.createObjectURL(blob);
+   189→      const a = document.createElement("a");
+   190→      a.href = url;
+   191→      a.download = filename;
+   192→      document.body.appendChild(a);
+   193→      a.click();
+   194→      a.remove();
+   195→      URL.revokeObjectURL(url);
+   196→    } catch (err) {
+   197→      console.error("Download failed:", err);
+   198→      alert("Download failed. Please try again.");
+   199→    } finally {
+   200→      setBusyAction(null);
+   201→    }
+   202→  };
+   203→
+   204→
+   205→  const handlePreview = (file: DocumentResponse) => {
+   206→    setPreviewDoc(file);
+   207→  };
+   208→
+   209→  const handleDeleteConfirm = async () => {
+   210→    if (!deleteTarget) return;
+   211→    setDeleting(true);
+   212→    setDeleteError("");
+   213→    try {
+   214→      await deleteFile(deleteTarget.id);
+   215→      setFiles((prev) => prev.filter((f) => f.id !== deleteTarget.id));
+   216→      setDeleteTarget(null);
+   217→    } catch (err: unknown) {
+   218→      setDeleteError(err instanceof Error ? err.message : t("files.deleteFailed"));
+   219→    } finally {
+   220→      setDeleting(false);
+   221→    }
+   222→  };
+   223→
+   224→  const getFileIcon = (mimeType: string | null) => {
+   225→    if (!mimeType) return FileText;
+   226→    if (mimeType.startsWith("image/")) return Image;
+   227→    if (mimeType.startsWith("audio/")) return Music;
+   228→    if (mimeType.startsWith("video/")) return Video;
+   229→    return FileText;
+   230→  };
+   231→
+   232→  // 18B6: trust the real pipeline status from the backend; the old
+   233→  // content_text/summary inference marked text-less images as "pending"
+   234→  // forever even though processing had completed.
+   235→  const statusOf = (file: DocumentResponse) => (file.status || "").toLowerCase();
+   236→
+   237→  const getStatusColor = (file: DocumentResponse) => {
+   238→    const s = statusOf(file);
+   239→    if (s === "completed" || s === "ready" || s === "done") return "text-success";
+   240→    if (s === "failed" || s === "error") return "text-destructive";
+   241→    if (!s) return file.content_text ? "text-success" : "text-muted-foreground";
+   242→    return "text-muted-foreground";
+   243→  };
+   244→
+   245→  const getStatusText = (file: DocumentResponse) => {
+   246→    const s = statusOf(file);
+   247→    if (s === "completed" || s === "ready" || s === "done") return t("files.processed");
+   248→    if (s === "failed" || s === "error") return tf("files.failed", "Failed");
+   249→    if (s === "processing" || s === "running") return t("files.processing");
+   250→    if (s) return t("files.pending");
+   251→    // legacy fallback if an older backend omits status
+   252→    if (file.content_text) return t("files.processed");
+   253→    if (file.summary) return t("files.processing");
+   254→    return t("files.pending");
+   255→  };
+   256→
+   257→  const formatDate = (dateString: string | null) => {
+   258→    if (!dateString) return "-";
+   259→    return new Date(dateString).toLocaleDateString();
+   260→  };
+   261→
+   262→  const formatSize = (bytes: number | null) => {
+   263→    if (!bytes) return "-";
+   264→    if (bytes < 1024) return bytes + " B";
+   265→    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+   266→    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+   267→  };
+   268→
+   269→  const filteredFiles = files.filter((f) =>
+   270→    f.filename.toLowerCase().includes(searchQuery.toLowerCase())
+   271→  );
+   272→
+   273→  return (
+   274→    <ProtectedRoute>
+   275→      <AppLayout>
+   276→        <div className="space-y-6">
+   277→          {/* Header */}
+   278→          <div className="flex items-center justify-between flex-wrap gap-4">
+   279→            <div>
+   280→              <h1 className="text-2xl font-bold text-foreground">{t("files.title")}</h1>
+   281→              <p className="text-muted-foreground text-sm mt-1">
+   282→                {files.length} {t("files.title").toLowerCase()}
+   283→              </p>
+   284→            </div>
+   285→            <div className="flex items-center gap-3 flex-wrap">
+   286→              {/* 18B6: permanent entry point for move-to-collection so the
+   287→                  feature is discoverable without selecting a file first */}
+   288→              {canUpload && (
+   289→                <button
+   290→                  onClick={openMoveDialog}
+   291→                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+   292→                    selected.size > 0
+   293→                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+   294→                      : "bg-card border border-border text-foreground hover:border-primary/50 hover:text-primary"
+   295→                  }`}
+   296→                  title={tf("files.moveHint", "Select files with the checkboxes, then choose a collection")}
+   297→                >
+   298→                  <FolderInput className="w-4 h-4" />
+   299→                  {t("files.bulkMove")}
+   300→                  {selected.size > 0 && (
+   301→                    <span className="px-1.5 py-0.5 rounded-full bg-primary-foreground/20 text-xs font-semibold">
+   302→                      {selected.size}
+   303→                    </span>
+   304→                  )}
+   305→                </button>
+   306→              )}
+   307→              <div className="relative">
+   308→                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   309→                <input
+   310→                  type="text"
+   311→                  value={searchQuery}
+   312→                  onChange={(e) => setSearchQuery(e.target.value)}
+   313→                  placeholder="Search files..."
+   314→                  className="pl-9 pr-4 py-2 bg-card border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
+   315→                />
+   316→              </div>
+   317→            </div>
+   318→          </div>
+   319→
+   320→          {/* Bulk selection bar */}
+   321→          {canUpload && selected.size > 0 && (
+   322→            <div className="flex items-center gap-3 flex-wrap p-3 rounded-xl bg-primary/10 border border-primary/30">
+   323→              <span className="text-sm font-semibold text-primary">
+   324→                {selected.size} {t("files.bulkSelected")}
+   325→              </span>
+   326→              {/* 18B7: move lives only in the toolbar now — one button, one place */}
+   327→              <button
+   328→                onClick={() => { setBulkError(""); setBulkDeleteOpen(true); }}
+   329→                disabled={bulkBusy}
+   330→                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-destructive text-destructive-foreground text-sm font-medium hover:bg-destructive/90 disabled:opacity-50"
+   331→              >
+   332→                <Trash2 className="w-4 h-4" />
+   333→                {t("files.bulkDelete")}
+   334→              </button>
+   335→              <button
+   336→                onClick={clearSelection}
+   337→                disabled={bulkBusy}
+   338→                className="ms-auto p-1.5 rounded-lg hover:bg-surface text-muted-foreground"
+   339→                title={t("files.bulkClear")}
+   340→              >
+   341→                <X className="w-4 h-4" />
+   342→              </button>
+   343→              {bulkError && <span className="text-sm text-destructive w-full">{bulkError}</span>}
+   344→            </div>
+   345→          )}
+   346→
+   347→          {/* File List */}
+   348→          {loading ? (
+   349→            <div className="flex items-center justify-center py-12">
+   350→              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+   351→            </div>
+   352→          ) : filteredFiles.length === 0 ? (
+   353→            <div className="text-center py-12 bg-card border border-border rounded-xl">
+   354→              <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+   355→              <p className="text-muted-foreground">
+   356→                {searchQuery ? "No matching files" : t("files.title")}
+   357→              </p>
+   358→            </div>
+   359→          ) : (
+   360→            <div className="glass-card rounded-xl overflow-hidden">
+   361→              <div className="overflow-x-auto">
+   362→                <table className="w-full">
+   363→                  <thead>
+   364→                    <tr className="border-b border-border bg-surface/50">
+   365→                      {canUpload && (
+   366→                        <th className="w-10 px-3 py-3">
+   367→                          <input
+   368→                            type="checkbox"
+   369→                            className="w-4 h-4 accent-primary cursor-pointer"
+   370→                            checked={filteredFiles.length > 0 && filteredFiles.every((f) => selected.has(f.id))}
+   371→                            onChange={(e) => {
+   372→                              if (e.target.checked) {
+   373→                                setSelected(new Set(filteredFiles.map((f) => f.id)));
+   374→                              } else {
+   375→                                clearSelection();
+   376→                              }
+   377→                            }}
+   378→                            aria-label={t("files.bulkSelectAll")}
+   379→                          />
+   380→                        </th>
+   381→                      )}
+   382→                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase">
+   383→                        {t("files.name")}
+   384→                      </th>
+   385→                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase">
+   386→                        {t("files.type")}
+   387→                      </th>
+   388→                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase">
+   389→                        {t("files.size")}
+   390→                      </th>
+   391→                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase">
+   392→                        {t("files.date")}
+   393→                      </th>
+   394→                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase">
+   395→                        {t("files.status")}
+   396→                      </th>
+   397→                      <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase">
+   398→                        {t("files.actions")}
+   399→                      </th>
+   400→                    </tr>
+   401→                  </thead>
+   402→                  <tbody className="divide-y divide-border">
+   403→                    {filteredFiles.map((file) => {
+   404→                      const Icon = getFileIcon(file.mime_type);
+   405→                      return (
+   406→                        <tr
+   407→                          key={file.id}
+   408→                          className={`hover:bg-surface/50 transition-colors ${selected.has(file.id) ? "bg-primary/5" : ""}`}
+   409→                        >
+   410→                          {canUpload && (
+   411→                            <td className="w-10 px-3 py-3">
+   412→                              <input
+   413→                                type="checkbox"
+   414→                                className="w-4 h-4 accent-primary cursor-pointer"
+   415→                                checked={selected.has(file.id)}
+   416→                                onChange={() => toggleSelected(file.id)}
+   417→                                aria-label={file.filename}
+   418→                              />
+   419→                            </td>
+   420→                          )}
+   421→                          <td className="px-4 py-3">
+   422→                            <div className="flex items-center gap-3">
+   423→                              <FileThumb
+   424→                                file={file}
+   425→                                Icon={Icon}
+   426→                                onOpen={() => router.push(`/viewer/?doc=${file.id}`)}
+   427→                              />
+   428→                              <button
+   429→                                onClick={() => router.push(`/viewer/?doc=${file.id}`)}
+   430→                                className="font-medium text-foreground truncate max-w-[200px] hover:text-primary hover:underline cursor-pointer text-left"
+   431→                                title={t("files.openViewer")}
+   432→                              >
+   433→                                {file.filename}
+   434→                              </button>
+   435→                              <PiiBadge
+   436→                                flagged={file.pii_flagged}
+   437→                                count={file.pii_count}
+   438→                                risk={file.pii_risk}
+   439→                                compact
+   440→                              />
+   441→                              {file.collection_id != null && (
+   442→                                <span
+   443→                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] font-medium"
+   444→                                  title={tf("files.restrictedHint", "Restricted — only members of this collection can see this file")}
+   445→                                >
+   446→                                  <Lock className="w-3 h-3" />
+   447→                                  {collectionName(file.collection_id) || tf("files.restrictedBadge", "Restricted")}
+   448→                                </span>
+   449→                              )}
+   450→                            </div>
+   451→                          </td>
+   452→                          <td className="px-4 py-3 text-sm text-muted-foreground">
+   453→                            {file.mime_type || "Unknown"}
+   454→                          </td>
+   455→                          <td className="px-4 py-3 text-sm text-muted-foreground">
+   456→                            {formatSize(file.file_size)}
+   457→                          </td>
+   458→                          <td className="px-4 py-3 text-sm text-muted-foreground">
+   459→                            <div className="flex items-center gap-1">
+   460→                              <Calendar className="w-3 h-3" />
+   461→                              {formatDate(file.created_at)}
+   462→                            </div>
+   463→                          </td>
+   464→                          <td className="px-4 py-3">
+   465→                            <span
+   466→                              className={`text-xs font-medium ${getStatusColor(
+   467→                                file
+   468→                              )}`}
+   469→                            >
+   470→                              {getStatusText(file)}
+   471→                            </span>
+   472→                          </td>
+   473→                          <td className="px-4 py-3">
+   474→                            <div className="flex items-center justify-end gap-2">
+   475→                              <button
+   476→                                onClick={() => handleDownload(file.id, file.filename)}
+   477→                                disabled={busyAction !== null}
+   478→                                className="p-2 hover:bg-primary/10 rounded-lg transition-colors disabled:opacity-50"
+   479→                                title={t("files.download")}
+   480→                                aria-label={t("files.download")}
+   481→                              >
+   482→                                {busyAction === `dl-${file.id}` ? (
+   483→                                  <Loader2 className="w-4 h-4 text-primary animate-spin" />
+   484→                                ) : (
+   485→                                  <Download className="w-4 h-4 text-primary" />
+   486→                                )}
+   487→                              </button>
+   488→                              <button
+   489→                                onClick={() => handlePreview(file)}
+   490→                                className="p-2 hover:bg-primary/10 rounded-lg transition-colors"
+   491→                                title={t("files.quickPreview")}
+   492→                              >
+   493→                                <Eye className="w-4 h-4 text-primary" />
+   494→                              </button>
+   495→                              {canUpload && (
+   496→                                <button
+   497→                                  onClick={() => { setDeleteError(""); setDeleteTarget({ id: file.id, filename: file.filename }); }}
+   498→                                  className="p-2 hover:bg-destructive/10 rounded-lg transition-colors"
+   499→                                  title={t("files.delete")}
+   500→                                  aria-label={t("files.delete")}
+   501→                                >
+   502→                                  <Trash2 className="w-4 h-4 text-destructive" />
+   503→                                </button>
+   504→                              )}
+   505→                            </div>
+   506→                          </td>
+   507→                        </tr>
+   508→                      );
+   509→                    })}
+   510→                  </tbody>
+   511→                </table>
+   512→              </div>
+   513→            </div>
+   514→          )}
+   515→        </div>
+   516→        {/* Extracted-content preview modal */}
+   517→        <DocumentPreviewModal
+   518→          doc={previewDoc}
+   519→          isOpen={!!previewDoc}
+   520→          onClose={() => setPreviewDoc(null)}
+   521→        />
+   522→
+   523→        {/* Delete confirmation modal */}
+   524→        {deleteTarget && (
+   525→          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+   526→            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !deleting && setDeleteTarget(null)} />
+   527→            <div className="relative glass-card rounded-2xl p-6 max-w-md w-full animate-fade-in">
+   528→              <h3 className="text-lg font-semibold text-foreground">{t("files.deleteConfirmTitle")}</h3>
+   529→              <p className="mt-2 text-sm text-muted-foreground">
+   530→                {t("files.deleteConfirmMsg")}{" "}
+   531→                <span className="font-medium text-foreground">&quot;{deleteTarget.filename}&quot;</span>
+   532→              </p>
+   533→              <p className="mt-1 text-sm text-destructive">{t("files.deleteUndo")}</p>
+   534→              {deleteError && (
+   535→                <p className="mt-3 p-2 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">{deleteError}</p>
+   536→              )}
+   537→              <div className="mt-6 flex items-center justify-end gap-3">
+   538→                <button
+   539→                  onClick={() => setDeleteTarget(null)}
+   540→                  disabled={deleting}
+   541→                  className="px-4 py-2 rounded-lg bg-surface border border-border text-sm font-medium text-foreground hover:bg-muted transition-all disabled:opacity-50"
+   542→                >
+   543→                  {t("files.cancel")}
+   544→                </button>
+   545→                <button
+   546→                  onClick={handleDeleteConfirm}
+   547→                  disabled={deleting}
+   548→                  className="px-4 py-2 rounded-lg bg-destructive text-destructive-foreground text-sm font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-2"
+   549→                >
+   550→                  {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
+   551→                  {deleting ? t("files.deleting") : t("files.delete")}
+   552→                </button>
+   553→              </div>
+   554→            </div>
+   555→          </div>
+   556→        )}
+   557→        {/* Bulk delete confirmation modal */}
+   558→        {bulkDeleteOpen && (
+   559→          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+   560→            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !bulkBusy && setBulkDeleteOpen(false)} />
+   561→            <div className="relative glass-card rounded-2xl p-6 max-w-md w-full animate-fade-in">
+   562→              <h3 className="text-lg font-semibold text-foreground">{t("files.bulkDeleteTitle")}</h3>
+   563→              <p className="mt-2 text-sm text-muted-foreground">
+   564→                {selected.size} {t("files.bulkDeleteMsg")}
+   565→              </p>
+   566→              <p className="mt-1 text-sm text-destructive">{t("files.deleteUndo")}</p>
+   567→              {bulkError && (
+   568→                <p className="mt-3 p-2 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">{bulkError}</p>
+   569→              )}
+   570→              <div className="mt-6 flex items-center justify-end gap-3">
+   571→                <button
+   572→                  onClick={() => setBulkDeleteOpen(false)}
+   573→                  disabled={bulkBusy}
+   574→                  className="px-4 py-2 rounded-lg bg-surface border border-border text-sm font-medium text-foreground hover:bg-muted transition-all disabled:opacity-50"
+   575→                >
+   576→                  {t("files.cancel")}
+   577→                </button>
+   578→                <button
+   579→                  onClick={handleBulkDelete}
+   580→                  disabled={bulkBusy}
+   581→                  className="px-4 py-2 rounded-lg bg-destructive text-destructive-foreground text-sm font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-2"
+   582→                >
+   583→                  {bulkBusy && <Loader2 className="w-4 h-4 animate-spin" />}
+   584→                  {bulkBusy ? t("files.deleting") : t("files.bulkDelete")}
+   585→                </button>
+   586→              </div>
+   587→            </div>
+   588→          </div>
+   589→        )}
+   590→
+   591→        {/* Move-to-collection modal */}
+   592→        {moveOpen && (
+   593→          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+   594→            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !bulkBusy && setMoveOpen(false)} />
+   595→            <div className="relative glass-card rounded-2xl p-6 max-w-md w-full animate-fade-in">
+   596→              <h3 className="text-lg font-semibold text-foreground">{t("files.bulkMoveTitle")}</h3>
+   597→              <p className="mt-2 text-sm text-muted-foreground">
+   598→                {selected.size} {t("files.bulkMoveMsg")}
+   599→              </p>
+   600→              {selected.size === 0 && (
+   601→                <p className="mt-2 p-2 rounded-lg bg-primary/5 border border-primary/20 text-sm text-muted-foreground">
+   602→                  {tf("files.moveNoSelection", "No files selected yet — tick the checkboxes next to the files you want to move, then pick the destination collection here.")}
+   603→                </p>
+   604→              )}
+   605→              <div className="mt-4 space-y-1 max-h-64 overflow-y-auto">
+   606→                <button
+   607→                  onClick={() => setMoveTarget(null)}
+   608→                  className={`w-full text-start px-3 py-2.5 rounded-lg text-sm border transition-colors ${
+   609→                    moveTarget === null
+   610→                      ? "bg-primary/10 border-primary/40 text-primary font-medium"
+   611→                      : "border-border text-foreground hover:bg-surface"
+   612→                  }`}
+   613→                >
+   614→                  {t("files.bulkMoveRoot")}
+   615→                </button>
+   616→                {collections.map((c) => (
+   617→                  <button
+   618→                    key={c.id}
+   619→                    onClick={() => setMoveTarget(c.id)}
+   620→                    className={`w-full text-start px-3 py-2.5 rounded-lg text-sm border transition-colors ${
+   621→                      moveTarget === c.id
+   622→                        ? "bg-primary/10 border-primary/40 text-primary font-medium"
+   623→                        : "border-border text-foreground hover:bg-surface"
+   624→                    }`}
+   625→                  >
+   626→                    {c.name}
+   627→                  </button>
+   628→                ))}
+   629→                {collections.length === 0 && (
+   630→                  <p className="text-xs text-muted-foreground px-1 pt-1">{t("files.bulkNoCollections")}</p>
+   631→                )}
+   632→              </div>
+   633→              {bulkError && (
+   634→                <p className="mt-3 p-2 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">{bulkError}</p>
+   635→              )}
+   636→              <div className="mt-6 flex items-center justify-end gap-3">
+   637→                <button
+   638→                  onClick={() => setMoveOpen(false)}
+   639→                  disabled={bulkBusy}
+   640→                  className="px-4 py-2 rounded-lg bg-surface border border-border text-sm font-medium text-foreground hover:bg-muted transition-all disabled:opacity-50"
+   641→                >
+   642→                  {t("files.cancel")}
+   643→                </button>
+   644→                <button
+   645→                  onClick={handleBulkMove}
+   646→                  disabled={bulkBusy || selected.size === 0}
+   647→                  className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all disabled:opacity-50 flex items-center gap-2"
+   648→                >
+   649→                  {bulkBusy && <Loader2 className="w-4 h-4 animate-spin" />}
+   650→                  {t("files.bulkMove")}
+   651→                </button>
+   652→              </div>
+   653→            </div>
+   654→          </div>
+   655→        )}
+   656→      </AppLayout>
+   657→    </ProtectedRoute>
+   658→  );
+   659→}
+   660→

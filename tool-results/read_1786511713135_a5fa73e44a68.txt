@@ -1,0 +1,843 @@
+     1→"use client";
+     2→
+     3→import { useState, useRef, useEffect, FormEvent, type ReactNode } from "react";
+     4→import { useI18n } from "@/i18n/i18n-context";
+     5→import { ProtectedRoute } from "@/components/protected-route";
+     6→import { AppLayout } from "@/components/app-layout";
+     7→import { useRouter } from "next/navigation";
+     8→import { chat, chatVoice, chatVision, speakText, getVisualThumbnailUrl, type ChatSource, type PiiNotice, type VisualCitation } from "@/lib/api";
+     9→import { PiiBadge } from "@/components/pii-badge";
+    10→import { Send, Loader2, User, Bot, Trash2, Sparkles, FileText, Music, Video, Image as ImageIcon, Mic, Square, Volume2, ChevronDown, ChevronRight, Paperclip, X } from "lucide-react";
+    11→
+    12→interface Message {
+    13→  id: string;
+    14→  role: "user" | "assistant";
+    15→  content: string;
+    16→  timestamp: Date;
+    17→  sources?: ChatSource[];
+    18→  piiNotice?: PiiNotice;
+    19→  question?: string;
+    20→  language?: string;  // Step 30E: ar/en/ur/hi - drives the speaker voice
+    21→}
+    22→
+    23→const CHAT_STATE_KEY = "seekra_chat_state";
+    24→const CHAT_STATE_VERSION = 1;
+    25→
+    26→function escapeRegExp(value: string): string {
+    27→  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    28→}
+    29→
+    30→/* Step 30G: Urdu-specific Nastaliq letters (ٹ ڈ ڑ ں ھ ہ ے) */
+    31→function isUrduText(text: string): boolean {
+    32→  return /[\u0679\u0688\u0691\u06BA\u06BE\u06C1\u06D2]/.test(text || "");
+    33→}
+    34→
+    35→/* Inline citations (Step 16.4): turn LLM-emitted [n] markers and any source
+    36→   filename mentioned in the answer into clickable links to that document.
+    37→   Deterministic — works even when the LLM never emits a marker. */
+    38→function renderAnswerContent(
+    39→  content: string,
+    40→  sources: ChatSource[] | undefined,
+    41→  onOpenDoc: (s: ChatSource) => void
+    42→): ReactNode {
+    43→  if (!sources || sources.length === 0) return content;
+    44→
+    45→  const filenames = sources
+    46→    .map((s) => s.filename)
+    47→    .filter(Boolean)
+    48→    .sort((a, b) => b.length - a.length)
+    49→    .map(escapeRegExp);
+    50→  const nameGroup = filenames.length > 0 ? `|(${filenames.join("|")})` : "";
+    51→  const pattern = new RegExp(`\\[(\\d{1,2})\\]${nameGroup}`, "g");
+    52→
+    53→  const nodes: ReactNode[] = [];
+    54→  let last = 0;
+    55→  let key = 0;
+    56→  for (const m of Array.from(content.matchAll(pattern))) {
+    57→    const idx = m.index ?? 0;
+    58→    if (idx > last) nodes.push(content.slice(last, idx));
+    59→    if (m[1] !== undefined) {
+    60→      const n = parseInt(m[1], 10);
+    61→      const s = sources[n - 1];
+    62→      if (s) {
+    63→        nodes.push(
+    64→          <button
+    65→            key={key++}
+    66→            onClick={() => onOpenDoc(s)}
+    67→            title={s.filename}
+    68→            className="inline-flex items-center justify-center rounded bg-primary/15 text-primary font-semibold px-1 mx-0.5 text-[11px] leading-4 hover:bg-primary/25 transition-colors"
+    69→          >
+    70→            [{n}]
+    71→          </button>
+    72→        );
+    73→      } else {
+    74→        nodes.push(m[0]); // out-of-range marker stays plain text
+    75→      }
+    76→    } else {
+    77→      const s = sources.find((x) => x.filename === m[0]);
+    78→      if (s) {
+    79→        nodes.push(
+    80→          <button
+    81→            key={key++}
+    82→            onClick={() => onOpenDoc(s)}
+    83→            className="text-primary font-medium underline decoration-primary/40 underline-offset-2 hover:decoration-primary transition-all break-all"
+    84→          >
+    85→            {m[0]}
+    86→          </button>
+    87→        );
+    88→      } else {
+    89→        nodes.push(m[0]);
+    90→      }
+    91→    }
+    92→    last = idx + m[0].length;
+    93→  }
+    94→  if (last < content.length) nodes.push(content.slice(last));
+    95→  return nodes;
+    96→}
+    97→
+    98→/* Authenticated thumbnail for a visual citation (same loader contract as the
+    99→   search page): fetch with bearer token, render as an object URL, clean up. */
+   100→function ChatVisualThumb({ assetId, alt }: { assetId: number; alt: string }) {
+   101→  const [url, setUrl] = useState<string | null>(null);
+   102→  const [failed, setFailed] = useState(false);
+   103→
+   104→  useEffect(() => {
+   105→    let active = true;
+   106→    let objectUrl: string | null = null;
+   107→    getVisualThumbnailUrl(assetId)
+   108→      .then((u) => {
+   109→        if (active) {
+   110→          objectUrl = u;
+   111→          setUrl(u);
+   112→        } else {
+   113→          URL.revokeObjectURL(u);
+   114→        }
+   115→      })
+   116→      .catch(() => {
+   117→        if (active) setFailed(true);
+   118→      });
+   119→    return () => {
+   120→      active = false;
+   121→      if (objectUrl) URL.revokeObjectURL(objectUrl);
+   122→    };
+   123→  }, [assetId]);
+   124→
+   125→  if (failed) {
+   126→    return (
+   127→      <div className="w-14 h-14 rounded-lg bg-surface border border-border flex items-center justify-center">
+   128→        <ImageIcon className="w-5 h-5 text-muted-foreground" />
+   129→      </div>
+   130→    );
+   131→  }
+   132→  if (!url) {
+   133→    return <div className="w-14 h-14 rounded-lg bg-surface border border-border animate-pulse" />;
+   134→  }
+   135→  return <img src={url} alt={alt} className="w-14 h-14 rounded-lg object-cover border border-border" />;
+   136→}
+   137→
+   138→export default function ChatPage() {
+   139→  const { t, isRTL } = useI18n();
+   140→  const router = useRouter();
+   141→  const [messages, setMessages] = useState<Message[]>(() => {
+   142→    if (typeof window === "undefined") return [];
+   143→    try {
+   144→      const raw = sessionStorage.getItem(CHAT_STATE_KEY);
+   145→      if (!raw) return [];
+   146→      const parsed = JSON.parse(raw);
+   147→      if (parsed?.v !== CHAT_STATE_VERSION || !Array.isArray(parsed?.messages)) return [];
+   148→      return parsed.messages.map((m: Message) => ({ ...m, timestamp: new Date(m.timestamp) }));
+   149→    } catch {
+   150→      return [];
+   151→    }
+   152→  });
+   153→  const [input, setInput] = useState("");
+   154→  const [isLoading, setIsLoading] = useState(false);
+   155→  const messagesEndRef = useRef<HTMLDivElement>(null);
+   156→  const inputRef = useRef<HTMLInputElement>(null);
+   157→  // Step 30: voice input (mic) + spoken answers (speaker)
+   158→  const [isRecording, setIsRecording] = useState(false);
+   159→  const recorderRef = useRef<MediaRecorder | null>(null);
+   160→  const chunksRef = useRef<Blob[]>([]);
+   161→  const [speakingId, setSpeakingId] = useState<string | null>(null);
+   162→  const audioRef = useRef<HTMLAudioElement | null>(null);
+   163→  // Step 30B: live voice meter + recording timer
+   164→  const [levels, setLevels] = useState<number[]>([0, 0, 0, 0, 0]);
+   165→  const [recSeconds, setRecSeconds] = useState(0);
+   166→  const timerRef = useRef<number | null>(null);
+   167→  const rafRef = useRef<number>(0);
+   168→  const audioCtxRef = useRef<AudioContext | null>(null);
+   169→  // Step 32A: sources strip collapsed by default (per-message expand)
+   170→  const [expandedSources, setExpandedSources] = useState<Record<string, boolean>>({});
+   171→  // Step 32: image attachment (multimodal chat)
+   172→  const [attachedImage, setAttachedImage] = useState<File | null>(null);
+   173→  const [attachedPreview, setAttachedPreview] = useState<string | null>(null);
+   174→  const fileInputRef = useRef<HTMLInputElement>(null);
+   175→  // Step 30F: mic language override ("" = auto), persisted
+   176→  const [voiceLang, setVoiceLang] = useState<string>(() => {
+   177→    if (typeof window === "undefined") return "";
+   178→    try { return localStorage.getItem("seekra_voice_lang") || ""; } catch { return ""; }
+   179→  });
+   180→
+   181→  const scrollToBottom = () => {
+   182→    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+   183→  };
+   184→
+   185→  useEffect(() => {
+   186→    scrollToBottom();
+   187→  }, [messages]);
+   188→
+   189→  useEffect(() => {
+   190→    try {
+   191→      sessionStorage.setItem(
+   192→        CHAT_STATE_KEY,
+   193→        JSON.stringify({ v: CHAT_STATE_VERSION, messages })
+   194→      );
+   195→    } catch {
+   196→      /* storage quota — non-fatal */
+   197→    }
+   198→  }, [messages]);
+   199→
+   200→  const handleSubmit = async (e: FormEvent) => {
+   201→    e.preventDefault();
+   202→    if (isLoading) return;
+   203→    if (attachedImage) { await sendVision(); return; }  // Step 32
+   204→    if (!input.trim()) return;
+   205→
+   206→    const userMessage: Message = {
+   207→      id: Math.random().toString(36).substring(7),
+   208→      role: "user",
+   209→      content: input.trim(),
+   210→      timestamp: new Date(),
+   211→    };
+   212→
+   213→    setMessages((prev) => [...prev, userMessage]);
+   214→    setInput("");
+   215→    setIsLoading(true);
+   216→
+   217→    try {
+   218→      // Step 25: recent turns let the backend resolve follow-ups
+   219→      // ("this book", "it") into a standalone retrieval query.
+   220→      const history = messages.slice(-6).map((m) => ({
+   221→        role: m.role,
+   222→        content: m.content,
+   223→      }));
+   224→      const response = await chat({
+   225→        question: userMessage.content,
+   226→        document_ids: [],
+   227→        history,
+   228→      });
+   229→
+   230→      const assistantMessage: Message = {
+   231→        id: Math.random().toString(36).substring(7),
+   232→        role: "assistant",
+   233→        content: response.answer,
+   234→        timestamp: new Date(),
+   235→        sources: response.sources || [],
+   236→        piiNotice: response.pii_notice,
+   237→        question: userMessage.content,
+   238→        language: response.language,
+   239→      };
+   240→
+   241→      setMessages((prev) => [...prev, assistantMessage]);
+   242→    } catch (err) {
+   243→      /* Surface the server's error detail (HTTP status / FastAPI detail) so a
+   244→         failing request is diagnosable from the UI without reading logs. */
+   245→      const detail = err instanceof Error && err.message ? err.message.trim() : "";
+   246→      const errorMessage: Message = {
+   247→        id: Math.random().toString(36).substring(7),
+   248→        role: "assistant",
+   249→        content: detail
+   250→          ? `${t("chat.errorMessage")}\n(${detail})`
+   251→          : t("chat.errorMessage"),
+   252→        timestamp: new Date(),
+   253→      };
+   254→      setMessages((prev) => [...prev, errorMessage]);
+   255→    } finally {
+   256→      setIsLoading(false);
+   257→      inputRef.current?.focus();
+   258→    }
+   259→  };
+   260→
+   261→  /* Step 32: multimodal chat - attach an image, ask about it. */
+   262→  const clearAttachment = () => {
+   263→    if (attachedPreview) URL.revokeObjectURL(attachedPreview);
+   264→    setAttachedImage(null);
+   265→    setAttachedPreview(null);
+   266→    if (fileInputRef.current) fileInputRef.current.value = "";
+   267→  };
+   268→
+   269→  const handleAttachClick = () => fileInputRef.current?.click();
+   270→
+   271→  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+   272→    const file = e.target.files?.[0];
+   273→    if (!file) return;
+   274→    clearAttachment();
+   275→    setAttachedImage(file);
+   276→    setAttachedPreview(URL.createObjectURL(file));
+   277→  };
+   278→
+   279→  const sendVision = async () => {
+   280→    if (!attachedImage || isLoading) return;
+   281→    const image = attachedImage;
+   282→    const question = input.trim();
+   283→    const userMessage: Message = {
+   284→      id: Math.random().toString(36).substring(7),
+   285→      role: "user",
+   286→      content: question || tf("chat.imageQuestion", "[Image question]"),
+   287→      timestamp: new Date(),
+   288→    };
+   289→    setMessages((prev) => [...prev, userMessage]);
+   290→    setInput("");
+   291→    clearAttachment();
+   292→    setIsLoading(true);
+   293→    try {
+   294→      const history = messages.slice(-6).map((m) => ({ role: m.role, content: m.content }));
+   295→      const response = await chatVision(image, image.name || "image.jpg", question, history);
+   296→      const assistantMessage: Message = {
+   297→        id: Math.random().toString(36).substring(7),
+   298→        role: "assistant",
+   299→        content: response.answer,
+   300→        timestamp: new Date(),
+   301→        sources: response.sources || [],
+   302→        piiNotice: response.pii_notice,
+   303→        question: userMessage.content,
+   304→        language: response.language,
+   305→      };
+   306→      setMessages((prev) => [...prev, assistantMessage]);
+   307→    } catch (err) {
+   308→      const detail = err instanceof Error && err.message ? err.message.trim() : "";
+   309→      const errorMessage: Message = {
+   310→        id: Math.random().toString(36).substring(7),
+   311→        role: "assistant",
+   312→        content: detail
+   313→          ? `${t("chat.errorMessage")}\n(${detail})`
+   314→          : t("chat.errorMessage"),
+   315→        timestamp: new Date(),
+   316→      };
+   317→      setMessages((prev) => [...prev, errorMessage]);
+   318→    } finally {
+   319→      setIsLoading(false);
+   320→      inputRef.current?.focus();
+   321→    }
+   322→  };
+   323→
+   324→  /* Step 30: mic questions — MediaRecorder -> /api/chat/voice (whisper STT,
+   325→     AR/EN auto-detect) -> the same chat pipeline as typed questions. */
+   326→  const sendVoice = async (blob: Blob, filename: string) => {
+   327→    setIsLoading(true);
+   328→    try {
+   329→      const history = messages.slice(-6).map((m) => ({ role: m.role, content: m.content }));
+   330→      const response = await chatVoice(blob, filename, history, voiceLang || undefined);
+   331→      const transcript = (response.transcript || "").trim();
+   332→      if (!transcript) {
+   333→        setMessages((prev) => [...prev, {
+   334→          id: Math.random().toString(36).substring(7),
+   335→          role: "assistant",
+   336→          content: tf("chat.noSpeech", "No speech detected - please try again."),
+   337→          timestamp: new Date(),
+   338→        }]);
+   339→        return;
+   340→      }
+   341→      const userMessage: Message = {
+   342→        id: Math.random().toString(36).substring(7),
+   343→        role: "user",
+   344→        content: transcript,
+   345→        timestamp: new Date(),
+   346→      };
+   347→      const assistantMessage: Message = {
+   348→        id: Math.random().toString(36).substring(7),
+   349→        role: "assistant",
+   350→        content: response.answer,
+   351→        timestamp: new Date(),
+   352→        sources: response.sources || [],
+   353→        piiNotice: response.pii_notice,
+   354→        question: transcript,
+   355→        language: response.language,
+   356→      };
+   357→      setMessages((prev) => [...prev, userMessage, assistantMessage]);
+   358→    } catch (err) {
+   359→      const detail = err instanceof Error && err.message ? err.message.trim() : "";
+   360→      const base = tf("chat.voiceError", "Microphone or voice service unavailable.");
+   361→      setMessages((prev) => [...prev, {
+   362→        id: Math.random().toString(36).substring(7),
+   363→        role: "assistant",
+   364→        content: detail ? `${base}\n(${detail})` : base,
+   365→        timestamp: new Date(),
+   366→      }]);
+   367→    } finally {
+   368→      setIsLoading(false);
+   369→    }
+   370→  };
+   371→
+   372→  const handleMicClick = async () => {
+   373→    if (isRecording) {
+   374→      recorderRef.current?.stop();
+   375→      return;
+   376→    }
+   377→    if (isLoading) return;
+   378→    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+   379→      setMessages((prev) => [...prev, {
+   380→        id: Math.random().toString(36).substring(7),
+   381→        role: "assistant",
+   382→        content: tf("chat.micUnsupported", "Voice input is not supported in this browser."),
+   383→        timestamp: new Date(),
+   384→      }]);
+   385→      return;
+   386→    }
+   387→    try {
+   388→      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+   389→      // Mobile-safe: pick the first supported container, else browser default
+   390→      const candidates = ["audio/webm", "audio/mp4", "audio/aac"];
+   391→      const mime = candidates.find((m) => MediaRecorder.isTypeSupported(m)) || "";
+   392→      const recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+   393→      const actual = recorder.mimeType || mime || "audio/webm";
+   394→      recorderRef.current = recorder;
+   395→      chunksRef.current = [];
+   396→
+   397→      // Siri-style live level meter (Web Audio analyser -> 5 reactive bars)
+   398→      try {
+   399→        const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+   400→        const actx = new Ctx();
+   401→        const analyser = actx.createAnalyser();
+   402→        analyser.fftSize = 64;
+   403→        actx.createMediaStreamSource(stream).connect(analyser);
+   404→        audioCtxRef.current = actx;
+   405→        const buf = new Uint8Array(analyser.frequencyBinCount);
+   406→        const tick = () => {
+   407→          analyser.getByteFrequencyData(buf);
+   408→          const n = Math.max(1, Math.floor(buf.length / 5));
+   409→          const bands = [0, 1, 2, 3, 4].map((b) => {
+   410→            let sum = 0;
+   411→            for (let i = b * n; i < (b + 1) * n && i < buf.length; i++) sum += buf[i];
+   412→            return Math.min(1, (sum / n / 255) * 1.6);
+   413→          });
+   414→          setLevels(bands);
+   415→          rafRef.current = requestAnimationFrame(tick);
+   416→        };
+   417→        rafRef.current = requestAnimationFrame(tick);
+   418→      } catch { /* the meter is cosmetic - recording still works */ }
+   419→
+   420→      setRecSeconds(0);
+   421→      timerRef.current = window.setInterval(() => setRecSeconds((s) => s + 1), 1000);
+   422→
+   423→      recorder.ondataavailable = (e) => {
+   424→        if (e.data.size > 0) chunksRef.current.push(e.data);
+   425→      };
+   426→      recorder.onstop = async () => {
+   427→        setIsRecording(false);
+   428→        if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+   429→        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+   430→        audioCtxRef.current?.close().catch(() => {});
+   431→        audioCtxRef.current = null;
+   432→        setLevels([0, 0, 0, 0, 0]);
+   433→        stream.getTracks().forEach((tr) => tr.stop());
+   434→        const ext = actual.includes("mp4") ? "m4a" : actual.includes("aac") ? "aac" : actual.includes("mpeg") ? "mp3" : "webm";
+   435→        const blob = new Blob(chunksRef.current, { type: actual });
+   436→        chunksRef.current = [];
+   437→        if (blob.size > 0) await sendVoice(blob, `voice.${ext}`);
+   438→      };
+   439→      recorder.start(250);
+   440→      setIsRecording(true);
+   441→    } catch (err) {
+   442→      // Step 30C: NotAllowedError = the user denied mic access once and the
+   443→      // browser remembers it (in a PWA there is no padlock to re-enable it).
+   444→      // Tell the user exactly how to unblock it. Other errors keep their
+   445→      // real detail for diagnosability.
+   446→      const errName = err instanceof DOMException ? err.name : "";
+   447→      const detail = err instanceof Error && err.message ? err.message.trim() : "";
+   448→      const base = errName === "NotAllowedError"
+   449→        ? tf("chat.micBlocked", "Microphone access is blocked for this app. Enable it in your phone settings (Apps > Seekra > Permissions > Microphone, or in the browser's site settings), then try again.")
+   450→        : tf("chat.voiceError", "Microphone or voice service unavailable.");
+   451→      setMessages((prev) => [...prev, {
+   452→        id: Math.random().toString(36).substring(7),
+   453→        role: "assistant",
+   454→        content: detail ? `${base}\n(${detail})` : base,
+   455→        timestamp: new Date(),
+   456→      }]);
+   457→    }
+   458→  };
+   459→
+   460→  /* Step 30: spoken answers — neural TTS (/api/chat/tts) with browser
+   461→     speechSynthesis as fallback. Citation markers [n] are stripped. */
+   462→  const stopSpeaking = () => {
+   463→    audioRef.current?.pause();
+   464→    audioRef.current = null;
+   465→    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+   466→      window.speechSynthesis.cancel();
+   467→    }
+   468→    setSpeakingId(null);
+   469→  };
+   470→
+   471→  const handleSpeak = async (message: Message) => {
+   472→    if (speakingId === message.id) {
+   473→      stopSpeaking();
+   474→      return;
+   475→    }
+   476→    stopSpeaking();
+   477→    const text = message.content.replace(/\[\d{1,2}\]/g, " ").trim();
+   478→    if (!text) return;
+   479→    setSpeakingId(message.id);
+   480→    try {
+   481→      const url = await speakText(text, message.language);
+   482→      const audio = new Audio(url);
+   483→      audioRef.current = audio;
+   484→      audio.onended = () => { setSpeakingId(null); URL.revokeObjectURL(url); };
+   485→      audio.onerror = () => { setSpeakingId(null); URL.revokeObjectURL(url); };
+   486→      await audio.play();
+   487→    } catch {
+   488→      // Neural TTS unavailable - browser speech fallback
+   489→      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+   490→        const u = new SpeechSynthesisUtterance(text);
+   491→        const bcp47 = { ar: "ar-SA", ur: "ur-PK", hi: "hi-IN", en: "en-US" }[message.language || ""]
+   492→          || (/[\u0600-\u06FF]/.test(text) ? "ar-SA" : "en-US");
+   493→        u.lang = bcp47;
+   494→        u.onend = () => setSpeakingId(null);
+   495→        u.onerror = () => setSpeakingId(null);
+   496→        window.speechSynthesis.speak(u);
+   497→      } else {
+   498→        setSpeakingId(null);
+   499→      }
+   500→    }
+   501→  };
+   502→
+   503→  /* t() with English fallback when the key is missing from the dictionaries */
+   504→  const tf = (key: string, fallback: string): string => {
+   505→    const v = t(key);
+   506→    return v && v !== key ? v : fallback;
+   507→  };
+   508→
+   509→  const formatSeek = (sec: number): string => {
+   510→    const m = Math.floor(sec / 60);
+   511→    const s = Math.floor(sec % 60);
+   512→    return `${m}:${String(s).padStart(2, "0")}`;
+   513→  };
+   514→
+   515→  const sourceIcon = (name: string) => {
+   516→    const ext = (name.split(".").pop() || "").toLowerCase();
+   517→    if (["mp3", "wav", "m4a", "ogg", "flac"].includes(ext)) return Music;
+   518→    if (["mp4", "mov", "webm", "mkv", "avi"].includes(ext)) return Video;
+   519→    if (["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext)) return ImageIcon;
+   520→    return FileText;
+   521→  };
+   522→
+   523→  /* Open a citation in the viewer at the cited page / timestamp, with the
+   524→     question terms highlighted (same URL contract as the search page). */
+   525→  const openSource = (s: ChatSource, question?: string) => {
+   526→    const qs = new URLSearchParams({ doc: String(s.document_id) });
+   527→    if (s.pages && s.pages.length > 0) qs.set("page", String(s.pages[0]));
+   528→    if (s.start_time != null) qs.set("t", String(s.start_time));
+   529→    if (question) qs.set("q", question);
+   530→    router.push(`/viewer/?${qs.toString()}`);
+   531→  };
+   532→
+   533→  /* Open a visual citation in the viewer at its page / video moment. */
+   534→  const openVisual = (s: ChatSource, v: VisualCitation, question?: string) => {
+   535→    const qs = new URLSearchParams({ doc: String(s.document_id) });
+   536→    if (v.page_number != null) qs.set("page", String(v.page_number));
+   537→    if (v.start_time != null) qs.set("t", String(v.start_time));
+   538→    if (question) qs.set("q", question);
+   539→    router.push(`/viewer/?${qs.toString()}`);
+   540→  };
+   541→
+   542→  const clearChat = () => {
+   543→    setMessages([]);
+   544→    try {
+   545→      sessionStorage.removeItem(CHAT_STATE_KEY);
+   546→    } catch {
+   547→      /* ignore */
+   548→    }
+   549→    inputRef.current?.focus();
+   550→  };
+   551→
+   552→  return (
+   553→    <ProtectedRoute>
+   554→      <AppLayout>
+   555→        {/* Step 30G: self-hosted Noto Nastaliq Urdu - no CDN, nothing leaves the box */}
+   556→        <style>{`@font-face{font-family:'Noto Nastaliq Urdu';src:url('/fonts/NotoNastaliqUrdu.woff2') format('woff2');font-display:swap;}`}</style>
+   557→        <div className="flex flex-col h-full -mx-4 sm:-mx-6">
+   558→          {/* Messages Area */}
+   559→          <div className="flex-1 overflow-y-auto px-4 sm:px-6">
+   560→            {messages.length === 0 ? (
+   561→              <div className="flex flex-col items-center justify-center h-full">
+   562→                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
+   563→                  <Sparkles className="w-8 h-8 text-primary" />
+   564→                </div>
+   565→                <h2 className="text-xl font-semibold text-foreground mb-2">
+   566→                  {t("chat.title")}
+   567→                </h2>
+   568→                <p className="text-muted-foreground text-sm max-w-md text-center">
+   569→                  {t("chat.welcomeMessage")}
+   570→                </p>
+   571→              </div>
+   572→            ) : (
+   573→              <div className="max-w-3xl mx-auto py-6 space-y-6">
+   574→                {messages.map((message) => (
+   575→                  <div
+   576→                    key={message.id}
+   577→                    className={`flex gap-4 ${
+   578→                      message.role === "user" ? "justify-end" : "justify-start"
+   579→                    }`}
+   580→                  >
+   581→                    {message.role === "assistant" && (
+   582→                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+   583→                        <Bot className="w-4 h-4 text-primary" />
+   584→                      </div>
+   585→                    )}
+   586→                    
+   587→                    <div
+   588→                      className={`max-w-[85%] sm:max-w-[75%] ${
+   589→                        message.role === "user" ? "order-first" : ""
+   590→                      }`}
+   591→                    >
+   592→                      <div
+   593→                        className={`rounded-2xl px-5 py-3.5 ${
+   594→                          message.role === "user"
+   595→                            ? "bg-primary text-primary-foreground"
+   596→                            : "glass-card text-foreground"
+   597→                        }`}
+   598→                      >
+   599→                        <p
+   600→                          dir="auto"
+   601→                          className={`text-sm whitespace-pre-wrap ${message.language === "ur" || isUrduText(message.content) ? "leading-[2.2]" : "leading-relaxed"}`}
+   602→                          style={message.language === "ur" || isUrduText(message.content) ? { fontFamily: "'Noto Nastaliq Urdu', 'Noto Naskh Arabic', serif" } : undefined}
+   603→                        >
+   604→                          {message.role === "assistant"
+   605→                            ? renderAnswerContent(message.content, message.sources, (s) => openSource(s, message.question))
+   606→                            : message.content}
+   607→                        </p>
+   608→                      </div>
+   609→                      {message.role === "assistant" && (message.piiNotice?.flagged_documents || 0) > 0 && (
+   610→                        <div className="mt-2 px-1">
+   611→                          <div className="inline-flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+   612→                            {tf(
+   613→                              "chat.piiNotice",
+   614→                              `PII policy notice: ${message.piiNotice?.flagged_documents} source document(s) contain ${message.piiNotice?.finding_count} masked finding(s).`
+   615→                            )}
+   616→                          </div>
+   617→                        </div>
+   618→                      )}
+   619→                      {message.role === "assistant" && message.sources && message.sources.length > 0 && (
+   620→                        <div className="mt-2 px-1">
+   621→                          <button
+   622→                            onClick={() => setExpandedSources((prev) => ({ ...prev, [message.id]: !prev[message.id] }))}
+   623→                            aria-expanded={!!expandedSources[message.id]}
+   624→                            className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors"
+   625→                          >
+   626→                            {expandedSources[message.id]
+   627→                              ? <ChevronDown className="w-3 h-3" />
+   628→                              : <ChevronRight className={`w-3 h-3 ${isRTL ? "rotate-180" : ""}`} />}
+   629→                            {tf("chat.sources", "Sources")} ({message.sources.length})
+   630→                          </button>
+   631→                          {expandedSources[message.id] && (
+   632→                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+   633→                          {message.sources.map((s, sourceIdx) => {
+   634→                            const Icon = sourceIcon(s.filename);
+   635→                            return (
+   636→                              <button
+   637→                                key={s.document_id}
+   638→                                onClick={() => openSource(s, message.question)}
+   639→                                title={s.filename}
+   640→                                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/80 px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:border-primary/50 transition-all"
+   641→                              >
+   642→                                <span className="font-semibold text-primary">[{sourceIdx + 1}]</span>
+   643→                                <Icon className="w-3 h-3 text-primary" />
+   644→                                <span className="max-w-[160px] truncate">{s.filename}</span>
+   645→                                {s.pages && s.pages.length > 0 && (
+   646→                                  <span className="font-medium text-primary">p.{s.pages[0]}</span>
+   647→                                )}
+   648→                                {(!s.pages || s.pages.length === 0) && s.start_time != null && (
+   649→                                  <span className="font-medium text-primary">{formatSeek(s.start_time)}</span>
+   650→                                )}
+   651→                                <PiiBadge pii={s.pii} compact />
+   652→                              </button>
+   653→                            );
+   654→                          })}
+   655→                          </div>
+   656→                          )}
+   657→                        </div>
+   658→                      )}
+   659→                      {message.role === "assistant" && message.sources?.some((s) => (s.visuals?.length || 0) > 0) && (
+   660→                        <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
+   661→                          {message.sources.flatMap((s) =>
+   662→                            (s.visuals || []).map((v) => (
+   663→                              <button
+   664→                                key={v.asset_id}
+   665→                                onClick={() => openVisual(s, v, message.question)}
+   666→                                title={`${s.filename}${v.labels && v.labels.length > 0 ? ` · ${v.labels.join(", ")}` : ""}`}
+   667→                                className="group relative rounded-lg overflow-hidden border border-border hover:border-primary/50 hover:scale-[1.03] transition-all"
+   668→                              >
+   669→                                <ChatVisualThumb assetId={v.asset_id} alt={s.filename} />
+   670→                                <span className="absolute bottom-0 inset-x-0 bg-black/55 text-white text-[9px] leading-tight px-1 py-0.5 truncate">
+   671→                                  {v.page_number != null
+   672→                                    ? `p.${v.page_number}`
+   673→                                    : v.start_time != null
+   674→                                      ? formatSeek(v.start_time)
+   675→                                      : tf("chat.visual", "Visual")}
+   676→                                </span>
+   677→                              </button>
+   678→                            ))
+   679→                          )}
+   680→                        </div>
+   681→                      )}
+   682→                      <div className="flex items-center gap-2 mt-1.5 px-1">
+   683→                        <p className="text-[10px] text-muted-foreground">
+   684→                          {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+   685→                        </p>
+   686→                        {message.role === "assistant" && message.content.trim().length > 0 && (
+   687→                          <button
+   688→                            onClick={() => handleSpeak(message)}
+   689→                            title={speakingId === message.id ? tf("chat.stopSpeaking", "Stop") : tf("chat.speak", "Listen")}
+   690→                            aria-label={speakingId === message.id ? tf("chat.stopSpeaking", "Stop") : tf("chat.speak", "Listen")}
+   691→                            className={`p-1 rounded-md transition-colors ${speakingId === message.id ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary hover:bg-primary/5"}`}
+   692→                          >
+   693→                            {speakingId === message.id ? <Square className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+   694→                          </button>
+   695→                        )}
+   696→                      </div>
+   697→                    </div>
+   698→
+   699→                    {message.role === "user" && (
+   700→                      <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-1">
+   701→                        <User className="w-4 h-4 text-primary-foreground" />
+   702→                      </div>
+   703→                    )}
+   704→                  </div>
+   705→                ))}
+   706→                
+   707→                {isLoading && (
+   708→                  <div className="flex gap-4">
+   709→                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+   710→                      <Bot className="w-4 h-4 text-primary" />
+   711→                    </div>
+   712→                    <div className="glass-card rounded-2xl px-5 py-3.5">
+   713→                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+   714→                        <Loader2 className="w-4 h-4 animate-spin" />
+   715→                        {t("chat.thinking")}
+   716→                      </div>
+   717→                    </div>
+   718→                  </div>
+   719→                )}
+   720→                <div ref={messagesEndRef} />
+   721→              </div>
+   722→            )}
+   723→          </div>
+   724→
+   725→          {/* Input Area */}
+   726→          <div className="flex-shrink-0 bg-background px-4 sm:px-6 py-4">
+   727→            <div className="max-w-3xl mx-auto">
+   728→              {messages.length > 0 && (
+   729→                <div className="flex justify-end mb-2">
+   730→                  <button
+   731→                    onClick={clearChat}
+   732→                    className="text-[10px] text-muted-foreground hover:text-destructive transition-colors flex items-center gap-1"
+   733→                  >
+   734→                    <Trash2 className="w-3 h-3" />
+   735→                    {t("chat.clearConversation")}
+   736→                  </button>
+   737→                </div>
+   738→              )}
+   739→              {isRecording && (
+   740→                <div className="mb-2 flex items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2.5">
+   741→                  <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
+   742→                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75" />
+   743→                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-destructive" />
+   744→                  </span>
+   745→                  <span className="text-xs font-medium text-destructive whitespace-nowrap">
+   746→                    {tf("chat.listening", "Listening…")} {formatSeek(recSeconds)}
+   747→                  </span>
+   748→                  <div className="flex items-end gap-1 h-5 flex-1 justify-center">
+   749→                    {levels.map((l, i) => (
+   750→                      <span
+   751→                        key={i}
+   752→                        style={{ height: `${Math.max(15, Math.round(l * 100))}%` }}
+   753→                        className="w-1.5 rounded-full bg-destructive/80 transition-[height] duration-100"
+   754→                      />
+   755→                    ))}
+   756→                  </div>
+   757→                  <span className="text-[10px] text-muted-foreground whitespace-nowrap hidden sm:inline">
+   758→                    {tf("chat.tapToStop", "Tap the mic to stop")}
+   759→                  </span>
+   760→                </div>
+   761→              )}
+   762→              {attachedPreview && (
+   763→                <div className="mb-2 inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-2 py-1.5">
+   764→                  <img src={attachedPreview} alt="" className="w-10 h-10 rounded-lg object-cover border border-border" />
+   765→                  <span className="text-[11px] text-muted-foreground max-w-[160px] truncate">{attachedImage?.name}</span>
+   766→                  <button
+   767→                    onClick={clearAttachment}
+   768→                    title={tf("chat.removeAttachment", "Remove")}
+   769→                    aria-label={tf("chat.removeAttachment", "Remove")}
+   770→                    className="p-1 rounded-md text-muted-foreground hover:text-destructive transition-colors"
+   771→                  >
+   772→                    <X className="w-3.5 h-3.5" />
+   773→                  </button>
+   774→                </div>
+   775→              )}
+   776→              <form onSubmit={handleSubmit} className="relative">
+   777→                <select
+   778→                  value={voiceLang}
+   779→                  onChange={(e) => {
+   780→                    setVoiceLang(e.target.value);
+   781→                    try { localStorage.setItem("seekra_voice_lang", e.target.value); } catch { /* ignore */ }
+   782→                  }}
+   783→                  title={tf("chat.voiceLang", "Voice language")}
+   784→                  aria-label={tf("chat.voiceLang", "Voice language")}
+   785→                  className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-surface text-[11px] text-muted-foreground border border-border rounded-lg px-1.5 py-2 focus:outline-none focus:border-primary/50 cursor-pointer"
+   786→                >
+   787→                  <option value="">{tf("chat.langAuto", "Auto")}</option>
+   788→                  <option value="ur">اردو</option>
+   789→                  <option value="ar">العربية</option>
+   790→                  <option value="en">English</option>
+   791→                </select>
+   792→                <input
+   793→                  ref={inputRef}
+   794→                  type="text"
+   795→                  value={input}
+   796→                  onChange={(e) => setInput(e.target.value)}
+   797→                  placeholder={t("chat.placeholder")}
+   798→                  disabled={isLoading}
+   799→                  className="w-full pl-[5.4rem] pr-[8.5rem] py-4 bg-surface border border-border rounded-2xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all disabled:opacity-50 text-sm shadow-sm"
+   800→                />
+   801→                <input
+   802→                  ref={fileInputRef}
+   803→                  type="file"
+   804→                  accept="image/*"
+   805→                  className="hidden"
+   806→                  onChange={handleFileChange}
+   807→                />
+   808→                <button
+   809→                  type="button"
+   810→                  onClick={handleAttachClick}
+   811→                  disabled={isLoading || isRecording}
+   812→                  title={tf("chat.attachImage", "Attach image")}
+   813→                  aria-label={tf("chat.attachImage", "Attach image")}
+   814→                  className="absolute right-[5.5rem] top-1/2 -translate-y-1/2 p-2.5 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed text-muted-foreground hover:text-primary hover:bg-primary/10"
+   815→                >
+   816→                  <Paperclip className="w-4 h-4" />
+   817→                </button>
+   818→                <button
+   819→                  type="button"
+   820→                  onClick={handleMicClick}
+   821→                  disabled={isLoading}
+   822→                  title={isRecording ? tf("chat.stopRecording", "Stop recording") : tf("chat.voice", "Voice question")}
+   823→                  aria-label={isRecording ? tf("chat.stopRecording", "Stop recording") : tf("chat.voice", "Voice question")}
+   824→                  className={`absolute right-12 top-1/2 -translate-y-1/2 p-2.5 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed ${isRecording ? "bg-destructive text-destructive-foreground animate-pulse" : "text-muted-foreground hover:text-primary hover:bg-primary/10"}`}
+   825→                >
+   826→                  {isRecording ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+   827→                </button>
+   828→                <button
+   829→                  type="submit"
+   830→                  disabled={isLoading || (!input.trim() && !attachedImage)}
+   831→                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+   832→                >
+   833→                  <Send className={`w-4 h-4 ${isRTL ? "rotate-180" : ""}`} />
+   834→                </button>
+   835→              </form>
+   836→            </div>
+   837→          </div>
+   838→        </div>
+   839→      </AppLayout>
+   840→    </ProtectedRoute>
+   841→  );
+   842→}
+   843→
