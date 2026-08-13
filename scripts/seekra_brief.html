@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Seekra — One-Page Brief</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  @page { size: 210mm 297mm; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 210mm; height: 297mm;
+    background: #202020;
+    font-family: 'Inter', sans-serif;
+    color: #E7E6E4;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .poster {
+    width: 210mm; height: 297mm;
+    padding: 22mm 18mm;
+    display: flex; flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+  /* Glow */
+  .glow {
+    position: absolute;
+    width: 500px; height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(181,152,118,0.15) 0%, rgba(181,152,118,0) 70%);
+    filter: blur(8px);
+    pointer-events: none;
+  }
+  .glow.tr { top: -200px; right: -150px; }
+  .glow.bl { bottom: -200px; left: -150px; }
+
+  /* Header */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 18mm;
+  }
+  .logo-block { display: flex; align-items: center; gap: 10px; }
+  .logo-mark { width: 36px; height: 36px; border-radius: 8px; }
+  .wordmark { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+  .header-tag {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.22em;
+    text-transform: uppercase; color: #B59876;
+  }
+
+  /* Hero */
+  .hero { margin-bottom: 14mm; }
+  .hero h1 {
+    font-size: 32px; font-weight: 700; line-height: 1.1;
+    letter-spacing: -0.025em; color: #E7E6E4;
+  }
+  .hero h1 .tan { color: #B59876; }
+  .hero h1 .red { color: #B93C32; }
+  .hero p {
+    margin-top: 8px;
+    font-size: 12px; line-height: 1.5;
+    color: rgba(231,230,228,0.65);
+    max-width: 160mm;
+  }
+
+  /* Section title */
+  .section-title {
+    font-size: 9px; font-weight: 800; letter-spacing: 0.22em;
+    text-transform: uppercase; color: #B93C32;
+    margin-bottom: 6mm;
+  }
+
+  /* Capabilities grid */
+  .caps {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 6mm; margin-bottom: 12mm;
+  }
+  .cap {
+    background: rgba(231,230,228,0.04);
+    border: 1px solid rgba(231,230,228,0.10);
+    border-radius: 10px; padding: 5mm;
+  }
+  .cap-title {
+    font-size: 12px; font-weight: 600; color: #B59876;
+    margin-bottom: 3px;
+  }
+  .cap-body {
+    font-size: 10px; line-height: 1.45; color: rgba(231,230,228,0.65);
+  }
+
+  /* Comparison */
+  .compare {
+    width: 100%; border-collapse: collapse;
+    font-size: 9.5px; margin-bottom: 10mm;
+  }
+  .compare th {
+    text-align: left; padding: 5px 8px;
+    font-size: 8px; font-weight: 700; letter-spacing: 0.14em;
+    text-transform: uppercase; color: #E7E6E4;
+    border-bottom: 1px solid rgba(231,230,228,0.10);
+  }
+  .compare td {
+    padding: 4px 8px;
+    border-bottom: 1px solid rgba(231,230,228,0.06);
+    color: rgba(231,230,228,0.80);
+  }
+  .compare .yes { color: #B59876; font-weight: 600; }
+  .compare .no { color: #B93C32; font-weight: 600; }
+  .compare .partial { color: rgba(231,230,228,0.50); font-style: italic; }
+
+  /* Deployment */
+  .deploy {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 4mm; margin-bottom: 10mm;
+  }
+  .tier {
+    background: rgba(231,230,228,0.04);
+    border: 1px solid rgba(231,230,228,0.10);
+    border-radius: 10px; padding: 4mm;
+    text-align: center;
+  }
+  .tier.featured {
+    background: rgba(181,152,118,0.10);
+    border: 1px solid rgba(181,152,118,0.30);
+  }
+  .tier-name { font-size: 11px; font-weight: 600; color: #E7E6E4; }
+  .tier-tag { font-size: 8px; color: #B59876; font-weight: 600; letter-spacing: 0.10em; text-transform: uppercase; margin-top: 2px; }
+  .tier-body { font-size: 9px; line-height: 1.4; color: rgba(231,230,228,0.55); margin-top: 4px; }
+
+  /* Footer */
+  .footer {
+    margin-top: auto;
+    display: flex; justify-content: space-between; align-items: flex-end;
+    padding-top: 6mm;
+    border-top: 1px solid rgba(231,230,228,0.10);
+  }
+  .footer-left { font-size: 9px; color: rgba(231,230,228,0.50); line-height: 1.5; }
+  .footer-left strong { color: #B59876; }
+  .footer-right { text-align: right; }
+  .footer-right .url { font-size: 14px; font-weight: 600; color: #E7E6E4; }
+  .footer-right .email { font-size: 9px; color: rgba(231,230,228,0.50); margin-top: 2px; }
+</style>
+</head>
+<body>
+<div class="poster">
+  <div class="glow tr"></div>
+  <div class="glow bl"></div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo-block">
+      <img src="https://seekra.pk/logo-seekra.png" alt="Seekra" class="logo-mark">
+      <span class="wordmark">Seekra</span>
+    </div>
+    <div class="header-tag">Product Brief · 2026</div>
+  </div>
+
+  <!-- Hero -->
+  <div class="hero">
+    <h1>Your documents finally <span class="tan">answer back</span><span class="red">.</span></h1>
+    <p>Self-hosted AI document intelligence for Gulf enterprises. Ask, see, and speak to your documents — every answer cited, every PII masked, every action auditable.</p>
+  </div>
+
+  <!-- Capabilities -->
+  <div class="section-title">Capabilities</div>
+  <div class="caps">
+    <div class="cap">
+      <div class="cap-title">Ask</div>
+      <div class="cap-body">Conversational Q&A with page-level citations. Every answer links to the exact source.</div>
+    </div>
+    <div class="cap">
+      <div class="cap-title">See</div>
+      <div class="cap-body">Search your archive with a photograph. Image-to-image similarity with detected-content labels.</div>
+    </div>
+    <div class="cap">
+      <div class="cap-title">Speak</div>
+      <div class="cap-body">Arabic-first voice interaction. Full RTL rendering. Voice-driven document navigation.</div>
+    </div>
+    <div class="cap">
+      <div class="cap-title">Trust</div>
+      <div class="cap-body">Tamper-evident audit chain. PII lineage tracking. Provenance graph for every answer.</div>
+    </div>
+  </div>
+
+  <!-- Comparison -->
+  <div class="section-title">How Seekra Compares</div>
+  <table class="compare">
+    <thead>
+      <tr>
+        <th style="width:55%">Capability</th>
+        <th style="width:22%">Seekra</th>
+        <th style="width:23%">Typical Cloud AI</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Data residency inside your infrastructure</td><td class="yes">✓ Yes</td><td class="no">✗ No</td></tr>
+      <tr><td>Air-gapped / offline option</td><td class="yes">✓ Yes</td><td class="no">✗ No</td></tr>
+      <tr><td>PII masked at source (provable lineage)</td><td class="yes">✓ Yes</td><td class="no">✗ No</td></tr>
+      <tr><td>Tamper-evident audit trail</td><td class="yes">✓ Yes</td><td class="no">✗ No</td></tr>
+      <tr><td>Document version diff</td><td class="yes">✓ Yes</td><td class="no">✗ No</td></tr>
+      <tr><td>Arabic voice (first-class)</td><td class="yes">✓ Yes</td><td class="partial">Partial</td></tr>
+      <tr><td>Confidence-aware answers</td><td class="yes">✓ Yes</td><td class="partial">Partial</td></tr>
+    </tbody>
+  </table>
+
+  <!-- Deployment -->
+  <div class="section-title">Deployment</div>
+  <div class="deploy">
+    <div class="tier">
+      <div class="tier-name">Cloud Native</div>
+      <div class="tier-tag">Fastest</div>
+      <div class="tier-body">Your cloud tenant. External AI models with PII masking.</div>
+    </div>
+    <div class="tier">
+      <div class="tier-name">Self-Hosted</div>
+      <div class="tier-tag">Sovereign</div>
+      <div class="tier-body">Your infrastructure. Local AI models. Nothing leaves your network.</div>
+    </div>
+    <div class="tier featured">
+      <div class="tier-name">Air-Gapped</div>
+      <div class="tier-tag">Maximum Security</div>
+      <div class="tier-body">Fully isolated. No external network. Updates via physical media.</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-left">
+      <strong>Book a demo:</strong> Live demo on your own documents.<br>
+      Prepared for Gulf region enterprise &amp; government buyers.
+    </div>
+    <div class="footer-right">
+      <div class="url">seekra.pk</div>
+      <div class="email">rahmirz.consulting@gmail.com</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
