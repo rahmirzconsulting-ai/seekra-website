@@ -3,6 +3,7 @@ import { Hero } from '@/components/site/hero';
 import { Problem } from '@/components/site/problem';
 import { Capabilities } from '@/components/site/capabilities';
 import { Trust } from '@/components/site/trust';
+import { Governance } from '@/components/site/governance';
 import { Comparison } from '@/components/site/comparison';
 import { Deployment } from '@/components/site/deployment';
 import { UseCases } from '@/components/site/use-cases';
@@ -18,6 +19,7 @@ export default function Home() {
         <Problem />
         <Capabilities />
         <Trust />
+        <Governance />
         <Comparison />
         <Deployment />
         <UseCases />

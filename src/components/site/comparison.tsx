@@ -14,6 +14,12 @@ const ROWS: Row[] = [
   { feature: 'Visual / image search', seekra: 'yes', cloud: 'partial' },
   { feature: 'Arabic voice (first-class)', seekra: 'yes', cloud: 'partial' },
   { feature: 'Offline operation', seekra: 'yes', cloud: 'no' },
+  { feature: 'Tamper-evident audit trail (hash-chained)', seekra: 'yes', cloud: 'no' },
+  { feature: 'PII lineage tracking (provable)', seekra: 'yes', cloud: 'no' },
+  { feature: 'Provenance graph (answer traceability)', seekra: 'yes', cloud: 'partial' },
+  { feature: 'Confidence-aware answers', seekra: 'yes', cloud: 'partial' },
+  { feature: 'Document version diff', seekra: 'yes', cloud: 'no' },
+  { feature: 'Voice-driven document navigation', seekra: 'yes', cloud: 'no' },
 ];
 
 function Status({ value }: { value: Row['seekra'] | Row['cloud'] }) {

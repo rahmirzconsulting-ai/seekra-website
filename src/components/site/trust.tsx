@@ -5,22 +5,22 @@ const SECURITY_CARDS = [
   {
     icon: Server,
     title: 'Three deployment tiers',
-    body: 'Cloud-native, self-hosted, or fully air-gapped. You choose where the AI runs and how isolated your environment is.',
+    body: 'Cloud-native, self-hosted, or fully air-gapped. You choose where the AI runs.',
   },
   {
     icon: EyeOff,
     title: 'PII masked at the source',
-    body: 'Names, ID numbers, emails, and phone numbers are automatically redacted before any AI call. Critical for the cloud-native tier where AI runs externally; preserved across all tiers.',
+    body: 'Names, IDs, emails, and phone numbers redacted before any AI call. Every masking event is logged with hash-chained lineage.',
   },
   {
     icon: ShieldCheck,
-    title: 'Role-based access control',
-    body: 'Granular permissions: administrators, editors, viewers, and read-only auditors. Collections can be restricted to specific users.',
+    title: 'Tamper-evident audit trail',
+    body: 'Every action is hash-chained. Any retroactive edit breaks the chain — detectable on demand via the admin API.',
   },
   {
     icon: ScrollText,
-    title: 'Full audit logging',
-    body: 'Every security-relevant action is logged with actor and detail — logins, password resets, file events, permission grants. Forensically reconstructable.',
+    title: 'Full audit logging + provenance',
+    body: 'Trace any answer to its source chunk, its PII findings, and the LLM calls that received the masked version.',
   },
 ] as const;
 
@@ -52,7 +52,7 @@ export function Trust() {
             Nothing leaves the box<span className="text-[#B93C32]" style={{ fontSize: '1.15em' }}>.</span>
           </h2>
           <p className="mt-6 text-[17px] leading-[1.6] text-[#E7E6E4]/78 max-w-[860px]">
-            This is the decisive argument for government, legal, healthcare, and financial buyers. Seekra offers three deployment tiers — cloud-native, self-hosted, or fully air-gapped — so you choose exactly where the AI runs and how isolated your environment is. Personal information is automatically detected and masked at the source, and in self-hosted and air-gapped deployments the AI model itself runs locally on your own servers — no data and no model ever leave the box.
+            Three deployment tiers — cloud-native, self-hosted, or fully air-gapped. You choose where the AI runs and how isolated your environment is. Personal information is masked at the source before any AI model is involved. In self-hosted and air-gapped deployments, the AI model itself runs on your servers — nothing leaves the box.
           </p>
         </Reveal>
 

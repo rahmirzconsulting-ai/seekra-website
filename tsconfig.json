@@ -43,6 +43,7 @@
     "mini-services",
     ".zscripts",
     "agent-ctx",
-    "download"
+    "download",
+    "seekra-app"
   ]
 }

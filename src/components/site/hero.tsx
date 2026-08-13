@@ -85,7 +85,7 @@ export function Hero() {
 
           {/* Hero subline — punchier, names specific document types, states the core feature */}
           <p className="mt-6 text-[16px] lg:text-[18px] leading-[1.6] text-[#E7E6E4]/78 max-w-[600px]">
-            Upload your contracts, policies, case files, and scans — Seekra turns them into a private assistant you can <span className="text-[#E7E6E4] font-medium">ask</span>, <span className="text-[#E7E6E4] font-medium">search by image</span>, or <span className="text-[#E7E6E4] font-medium">speak to</span> in Arabic or English. Every answer is cited to the exact source page, and nothing leaves your infrastructure.
+            Upload your contracts, policies, case files, and scans — Seekra turns them into a private assistant you can <span className="text-[#E7E6E4] font-medium">ask</span>, <span className="text-[#E7E6E4] font-medium">search by image</span>, or <span className="text-[#E7E6E4] font-medium">speak to</span> in Arabic or English. Every answer cited to its source, every PII masked, every action auditable.
           </p>
 
           {/* Floating glass chips — reduced to 2 trust signals not already in the subline */}

@@ -21,9 +21,12 @@ const SITE_URL = "https://seekra.pk";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "Seekra — Content-Aware Intelligence for the Enterprise",
+  title: {
+    default: "Seekra — Content-Aware Intelligence for the Enterprise",
+    template: "%s | Seekra",
+  },
   description:
-    "Seekra is content-aware intelligence that runs on your infrastructure. Ask, see, and speak to your archive — every answer cited to its source. Self-hosted, PII-masked, Arabic-first.",
+    "Self-hosted AI document intelligence for Gulf enterprises. Ask, see, and speak to your documents — every answer cited, every PII masked, every action auditable. Arabic-first, air-gap ready.",
   keywords: [
     "Seekra",
     "AI document intelligence",
@@ -35,6 +38,20 @@ export const metadata: Metadata = {
     "content-aware intelligence",
     "cited AI answers",
     "PII masking",
+    "tamper-evident audit",
+    "document version comparison",
+    "AI governance",
+    "enterprise search",
+    "RAG",
+    "retrieval augmented generation",
+    "Arabic document AI",
+    "Saudi Arabia AI",
+    "UAE AI",
+    "government AI",
+    "compliance AI",
+    "document diff",
+    "voice document search",
+    "multilingual AI",
   ],
   authors: [{ name: "Seekra" }],
   creator: "Seekra",
@@ -53,7 +70,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Seekra — Content-Aware Intelligence for the Enterprise",
     description:
-      "Your documents finally answer back. Seekra is content-aware intelligence that runs on your infrastructure. Ask, see, and speak to your archive — every answer cited to its source.",
+      "Your documents finally answer back. Self-hosted AI document intelligence — every answer cited, every PII masked, every action auditable. Arabic-first, air-gap ready.",
     url: SITE_URL,
     siteName: "Seekra",
     type: "website",
@@ -71,7 +88,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Seekra — Content-Aware Intelligence",
     description:
-      "Your documents finally answer back. Self-hosted AI document intelligence for regulated enterprises. Arabic-first, PII-masked, cited answers.",
+      "Self-hosted AI document intelligence. Every answer cited. Every PII masked. Every action auditable. Arabic-first, air-gap ready.",
     images: ["/logo-seekra.png"],
   },
   robots: {
@@ -83,6 +100,44 @@ export const metadata: Metadata = {
       "max-image-preview": "large",
       "max-snippet": -1,
     },
+  },
+};
+
+// JSON-LD structured data for Google Search
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Seekra",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  description:
+    "Self-hosted AI document intelligence for Gulf enterprises. Ask, see, and speak to your documents — every answer cited, every PII masked, every action auditable.",
+  url: SITE_URL,
+  logo: `${SITE_URL}/logo-seekra.png`,
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+    description: "Book a demo for pricing.",
+  },
+  featureList: [
+    "Conversational Q&A with page-level citations",
+    "Visual / image search",
+    "Arabic-first voice interaction",
+    "PII masking before AI calls",
+    "Tamper-evident audit trail (hash-chained)",
+    "PII lineage tracking (provable PII-before-LLM)",
+    "Provenance graph (full answer traceability)",
+    "Confidence-aware answers",
+    "Document diff / versioning",
+    "Voice-driven document navigation",
+    "Three deployment tiers: Cloud Native, Self-Hosted, Air-Gapped",
+  ],
+  publisher: {
+    "@type": "Organization",
+    name: "Seekra",
+    url: SITE_URL,
+    logo: `${SITE_URL}/logo-seekra.png`,
   },
 };
 
@@ -100,6 +155,11 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: "document.documentElement.classList.remove('reveal-no-js');",
           }}
+        />
+        {/* JSON-LD structured data for Google Search */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
       <body
