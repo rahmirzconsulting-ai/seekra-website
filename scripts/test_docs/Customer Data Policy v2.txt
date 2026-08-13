@@ -1,0 +1,31 @@
+Customer Data Policy v2
+
+Effective Date: August 1, 2026
+
+1. Scope
+This policy applies to all employees, contractors, third-party vendors, and cloud service providers who access, process, or store customer data within the organization's systems or cloud environments.
+
+2. Data Classification
+Customer data is classified into four categories:
+- Public: Information approved for public release (e.g., marketing materials, published reports)
+- Internal: Operational data not intended for public release (e.g., internal procedures, training materials)
+- Confidential: Sensitive customer information including names, addresses, phone numbers, email addresses, and account numbers
+- Restricted: Highly sensitive data including passport numbers, Emirates ID numbers, biometric data, and financial records
+
+3. Data Retention
+Customer records must be retained for seven years from the date of account closure. Records flagged as part of an active investigation are exempt and held until legal release. After the retention period, records must be securely destroyed using approved data destruction methods.
+
+4. Access Control
+Access to confidential and restricted customer data is restricted to authorized personnel only. Access requests must be submitted through the IT service desk and approved by the data owner. Access logs must be reviewed monthly. Multi-factor authentication is required for all access to restricted data.
+
+5. Data Breach Response
+In the event of a suspected data breach, the incident must be reported to the security team within 12 hours. The security team will coordinate with legal and compliance teams to assess the impact and notify affected customers within 48 hours. Regulatory authorities must be notified within 72 hours.
+
+6. Data Transfer
+Customer data may only be transferred to third parties or cloud providers located in approved jurisdictions. Cross-border transfers require explicit written approval from the Data Protection Officer.
+
+7. Contact Information
+For questions about this policy, contact the Data Protection Officer at sarah.smith@example.com or call +971509876543.
+
+Prepared by: Legal and Compliance Department
+Version: 2
