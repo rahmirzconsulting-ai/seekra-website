@@ -149,6 +149,8 @@ export default function RootLayout({
   return (
     <html lang="en" className="reveal-no-js" suppressHydrationWarning>
       <head>
+        {/* Google Search Console verification */}
+        <meta name="google-site-verification" content="ietDPWLPQdfb_ICyKK09gWw-AKsqe2RBc4cY0j3r3aI" />
         {/* Mark JS as ready — removes the no-JS fallback so Reveal animations work.
             If JS is disabled, the class stays and .reveal elements are always visible. */}
         <script
