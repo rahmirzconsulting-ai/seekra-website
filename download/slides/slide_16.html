@@ -1,11 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
+<html lang="en"><head>
   <meta charset="UTF-8">
   <title>Seekra — Appendix · Deployment Architecture</title>
   <link rel="stylesheet" href="global.css">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <script src="https://artifacts-cdn.chatglm.site/https://cdn.tailwindcss.com" data-z-original-src="https://cdn.tailwindcss.com"></script>
+  <link href="https://artifacts-cdn.chatglm.site/https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" data-z-original-href="https://fonts.googleapis.com/icon?family=Material+Icons">
   <style>
     .slide-14 {
       padding: 32px 40px 28px !important;
@@ -68,7 +66,7 @@
 <body>
   <div class="slide slide-dark slide-14">
     <!-- Decorative tan glow top-right -->
-    <div class="glow-tan tr" data-decor aria-hidden="true"></div>
+    <div class="glow-tan tr" data-decor="" aria-hidden="true"></div>
 
     <div class="header-row" style="position: relative; z-index: 2;">
       <div class="eyebrow">Appendix · Deployment Architecture</div>
@@ -80,7 +78,7 @@
     </div>
 
     <div class="diagram-wrap" style="position: relative; z-index: 2;">
-      <img src="seekra_deployment_architecture.png" alt="Seekra three-tier deployment architecture: Cloud Native, Self-Hosted, Air-Gapped">
+      <img src="https://chat.z.ai/api/v1/sandbox/version/file?path=download%2Fslides%2Fseekra_deployment_architecture.png&amp;chatId=e24a4df6-2520-4c5f-83ed-379037f81a88" alt="Seekra three-tier deployment architecture: Cloud Native, Self-Hosted, Air-Gapped">
     </div>
 
     <div class="footer-note">
@@ -88,12 +86,13 @@
     </div>
   </div>
 
-  <aside data-notes class="hidden">
+  <aside data-notes="" class="hidden">
     • This is a reference appendix slide — use it when the client asks for architectural detail beyond the 3-card overview on slide 10.
     • Walk left-to-right: Cloud Native (external AI with PII masking) → Self-Hosted (local AI, your infrastructure) → Air-Gapped (local AI, fully isolated, updates via physical media).
-    • The dashed boundary in each tier is the customer perimeter — note how the AI box moves from outside (tier 1) to inside (tiers 2 & 3) the boundary.
+    • The dashed boundary in each tier is the customer perimeter — note how the AI box moves from outside (tier 1) to inside (tiers 2 &amp; 3) the boundary.
     • The network bar at the bottom of each tier is the key differentiator: connected (amber) → updates only (green) → fully isolated (brick red).
     • If the client wants even more detail, offer to walk through a single tier in depth on a follow-up call.
   </aside>
-</body>
-</html>
+
+
+</body></html>

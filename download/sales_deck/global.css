@@ -1,0 +1,85 @@
+/* Seekra Sales Deck — Global Stylesheet */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --charcoal: #202020;
+  --charcoal-2: #1A1A1A;
+  --cream: #E7E6E4;
+  --warm-gray: #D8D6D3;
+  --tan: #B59876;
+  --tan-soft: #C9B498;
+  --brick: #B93C32;
+  --ink: #1F1A14;
+  --ink-2: #4A3F33;
+  --hair-dark: rgba(231, 230, 228, 0.10);
+  --hair-light: rgba(31, 26, 20, 0.12);
+  --font-heading: 'Inter', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+.slide {
+  width: 1280px;
+  height: 720px;
+  overflow: hidden;
+  position: relative;
+  padding: 56px 64px;
+  font-family: var(--font-body);
+  letter-spacing: -0.005em;
+}
+
+.slide-dark { background: var(--charcoal); color: var(--cream); }
+.slide-light { background: var(--cream); color: var(--ink); }
+
+.glow {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(8px);
+}
+.glow.tr { width: 600px; height: 600px; top: -200px; right: -180px;
+  background: radial-gradient(circle, rgba(181,152,118,0.18) 0%, rgba(181,152,118,0) 65%); }
+.glow.bl { width: 600px; height: 600px; bottom: -200px; left: -180px;
+  background: radial-gradient(circle, rgba(181,152,118,0.15) 0%, rgba(181,152,118,0) 65%); }
+.glow.center { width: 800px; height: 800px; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(181,152,118,0.20) 0%, rgba(181,152,118,0) 65%); }
+
+.logo-mark { width: 36px; height: 36px; border-radius: 8px; }
+.wordmark { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+
+.eyebrow {
+  font-size: 12px; font-weight: 800;
+  letter-spacing: 0.22em; text-transform: uppercase;
+}
+.eyebrow-tan { color: var(--tan); }
+.eyebrow-brick { color: var(--brick); }
+.eyebrow-ink { color: var(--ink); }
+
+.headline {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+}
+.headline .tan { color: var(--tan); }
+.headline .red { color: var(--brick); }
+
+.card-dark {
+  background: rgba(231,230,228,0.05);
+  border: 1px solid rgba(231,230,228,0.15);
+  border-radius: 14px;
+  padding: 24px;
+}
+.card-light {
+  background: #FFFFFF;
+  border: 1px solid var(--hair-light);
+  border-radius: 14px;
+  padding: 24px;
+}
+
+[data-notes] {
+  position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0,0,0,0);
+  white-space: nowrap; border: 0;
+}
