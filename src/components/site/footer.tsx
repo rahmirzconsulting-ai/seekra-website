@@ -47,15 +47,21 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Anchor links */}
-          <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px]">
+          {/* Anchor links — grouped, matching the navbar */}
+          <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px]">
+            <span className="text-[#E7E6E4]/40 font-medium tracking-tight mr-1">Platform</span>
             <a href="#capabilities" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Capabilities</a>
-            <a href="#access-control" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Access Control</a>
-            <a href="#connectors" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Connectors</a>
             <a href="#intelligence" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Intelligence</a>
+            <span className="text-[#E7E6E4]/20 mx-1">·</span>
+            <span className="text-[#E7E6E4]/40 font-medium tracking-tight mr-1">Trust</span>
+            <a href="#access-control" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Access Control</a>
             <a href="#governance" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Governance</a>
-            <a href="#comparison" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Comparison</a>
+            <span className="text-[#E7E6E4]/20 mx-1">·</span>
+            <span className="text-[#E7E6E4]/40 font-medium tracking-tight mr-1">Connect</span>
+            <a href="#connectors" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Connectors</a>
             <a href="#deployment" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Deployment</a>
+            <span className="text-[#E7E6E4]/20 mx-1">·</span>
+            <a href="#comparison" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Compare</a>
             <a href="#contact" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Contact</a>
             <a
               href={SITE_CONFIG.appBridgeUrl}
