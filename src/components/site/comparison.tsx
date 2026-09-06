@@ -63,7 +63,7 @@ export function Comparison() {
             Three-way comparison<span className="text-[#B93C32]">.</span>
           </h2>
           <p className="mt-4 text-[16px] leading-[1.55] text-[#4A3F33] max-w-[880px]">
-            Cloud AI (ChatGPT, Gemini) is strong for general-purpose work but fails on data residency and access control. Legacy enterprise search (Elastic, Solr) is strong on residency but offers no AI. Seekra is purpose-built for the gap between them — Gulf enterprise data handling with cited AI answers.
+            Different tools solve different problems. General-purpose AI assistants excel at open-ended questions but were not built for regulated document archives. Traditional enterprise search keeps data inside your perimeter but stops at keywords. Seekra brings the natural-language, cited-answer experience of AI together with the residency, scoping, and auditability that regulated industries require — in one platform.
           </p>
         </Reveal>
 
