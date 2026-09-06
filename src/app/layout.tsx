@@ -126,7 +126,7 @@ const jsonLd = {
     "Arabic-first voice interaction",
     "PII masking before AI calls",
     "Tamper-evident audit trail (hash-chained)",
-    "PII lineage tracking (provable PII-before-LLM)",
+    "PII lineage tracking (provable PII-before-AI)",
     "Provenance graph (full answer traceability)",
     "Confidence-aware answers",
     "Document diff / versioning",

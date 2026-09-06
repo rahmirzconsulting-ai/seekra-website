@@ -27,7 +27,7 @@ const SCENES = [
   },
   {
     id: 'connectors',
-    label: 'Connectors — SharePoint, Drive, S3, SFTP',
+    label: 'Connectors — your existing document sources',
     pill: 'Connect',
     caption: '9 data sources · auto-ingest',
     render: () => <ConnectorsScene />,
@@ -99,7 +99,7 @@ export function Hero() {
 
           {/* Hero subline — punchier, names specific document types, states the core feature */}
           <p className="mt-6 text-[16px] lg:text-[18px] leading-[1.6] text-[#E7E6E4]/78 max-w-[600px]">
-            Connect Seekra to your SharePoint, Google Drive, or network share — and your contracts, policies, case files, and scans become a private assistant you can <span className="text-[#E7E6E4] font-medium">ask</span>, <span className="text-[#E7E6E4] font-medium">search by image</span>, or <span className="text-[#E7E6E4] font-medium">speak to</span> in Arabic or English. Every answer cited to its source, every PII masked, every action auditable, every document scoped to your org tree.
+            Connect Seekra to your existing document stores — and your contracts, policies, case files, and scans become a private assistant you can <span className="text-[#E7E6E4] font-medium">ask</span>, <span className="text-[#E7E6E4] font-medium">search by image</span>, or <span className="text-[#E7E6E4] font-medium">speak to</span> in Arabic or English. Every answer cited to its source, every PII masked, every action auditable, every document scoped to your organization.
           </p>
 
           {/* Live demo badge */}
@@ -108,7 +108,7 @@ export function Hero() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#B59876] opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-[#B59876]"></span>
             </span>
-            Live demo running — see real answers from a 32-document Dubai media-holding library
+            Book a live demo — see real answers from a working enterprise library
           </div>
 
           {/* Floating glass chips — reduced to 2 trust signals not already in the subline */}
@@ -406,12 +406,12 @@ function ConnectorsScene() {
           Auto-ingest
         </div>
         <div className="text-[11px] leading-[1.5] text-[#1F1A14]">
-          Drop files in /ingest/ → indexed in 60s. SharePoint changes → versioned automatically. No manual upload.
+          Files appear in Seekra automatically — no manual upload, no IT ticket.
         </div>
       </div>
       <div className="mt-3 flex items-center gap-1.5 text-[10px] text-[#4A3F33]">
         <span className="w-1.5 h-1.5 rounded-full bg-[#5cb87a]"></span>
-        <span>Synced 2 min ago · 1,247 files</span>
+        <span>Synced automatically · runs on a schedule</span>
       </div>
     </div>
   );
@@ -422,12 +422,12 @@ function ConnectorsScene() {
    ───────────────────────────────────────────────────────────── */
 function AccessControlScene() {
   const tree = [
-    { name: 'Seekra Holdings', depth: 0, count: '32 docs' },
-    { name: 'Group Executive', depth: 1, count: '4 docs', cls: 'Internal' },
-    { name: 'Group Finance', depth: 1, count: '3 docs', cls: 'Restricted' },
-    { name: 'Seekra Films', depth: 1, count: '10 docs' },
-    { name: 'Films · Production', depth: 2, count: '4 docs', cls: 'Confidential' },
-    { name: 'Seekra Creative', depth: 1, count: '5 docs' },
+    { name: 'Your Organization', depth: 0, count: '32 docs' },
+    { name: 'Executive Office', depth: 1, count: '4 docs', cls: 'Internal' },
+    { name: 'Finance', depth: 1, count: '3 docs', cls: 'Restricted' },
+    { name: 'Operations', depth: 1, count: '10 docs' },
+    { name: 'Operations · Production', depth: 2, count: '4 docs', cls: 'Confidential' },
+    { name: 'Sales & Marketing', depth: 1, count: '5 docs' },
   ];
   const clsColors: Record<string, string> = {
     'Public': '#5cb87a',
@@ -466,7 +466,7 @@ function AccessControlScene() {
         ))}
       </div>
       <div className="mt-3 text-[10px] text-[#4A3F33] leading-[1.5]">
-        <span className="font-semibold text-[#1F1A14]">Clearance:</span> viewers see only docs at or below their clearance level. A Films·Production viewer with clearance 1 cannot see the Confidential scene footage — even in their own department.
+        <span className="font-semibold text-[#1F1A14]">Clearance:</span> each user sees only documents at or below their clearance level — even within their own department.
       </div>
     </div>
   );

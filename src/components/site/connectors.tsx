@@ -2,39 +2,39 @@ import { FolderSync, RefreshCw, GitBranch, ShieldAlert } from 'lucide-react';
 import { Reveal } from './reveal';
 
 const CONNECTORS = [
-  { name: 'Local folder', desc: 'Drop files on /ingest/ mount — auto-indexed in 60s. Path rules infer scope + classification from the folder path.', featured: true },
-  { name: 'SharePoint / OneDrive', desc: 'Microsoft Graph API. Polls every 15 min (configurable). Path rules map SharePoint folders to org-tree nodes.', featured: false },
-  { name: 'Google Drive', desc: 'Service-account auth. Reconstructs Drive paths from parent chain. Shared drives supported.', featured: false },
-  { name: 'AWS S3', desc: 'Bucket + prefix sync. IAM or static credentials. Resumable for large folders (10k+ files).', featured: false },
-  { name: 'Azure Blob', desc: 'Connection string + container. Incremental sync via ETag change detection.', featured: false },
-  { name: 'Google Cloud Storage', desc: 'Service-account JSON. Bucket + prefix. Same incremental logic as S3.', featured: false },
-  { name: 'Alibaba OSS', desc: 'For China-facing tenants. OSS access-key + bucket. Same sync engine as other object stores.', featured: false },
-  { name: 'SFTP', desc: 'Host + key-based auth. Polls the remote tree; incremental via mtime. For legacy shared-host environments.', featured: false },
-  { name: 'IMAP / SMTP', desc: 'Forward ingest@your-tenant.seekra.pk → attachments auto-ingest. Sender domain maps to org scope.', featured: false },
+  { name: 'Local / network folder', desc: 'Point Seekra at a shared drive or mounted folder — new and changed files are picked up automatically, with the right scope and classification applied based on the folder path.', featured: true },
+  { name: 'SharePoint / OneDrive', desc: 'Connect to a SharePoint site or OneDrive folder. Folder structure maps to your organization tree, so the right people see the right documents.' },
+  { name: 'Google Drive', desc: 'Service-account authentication. Reconstructs Drive paths from the parent chain so you can scope by folder. Shared drives supported.' },
+  { name: 'Amazon S3', desc: 'Sync from any S3 bucket by prefix. Resumable for large archives (tens of thousands of files).' },
+  { name: 'Azure Blob Storage', desc: 'Connection-string authentication. Incremental sync detects changes via storage versioning metadata.' },
+  { name: 'Google Cloud Storage', desc: 'Service-account authentication. Same incremental sync logic as Amazon S3.' },
+  { name: 'Alibaba Cloud OSS', desc: 'For China-facing tenants. Same sync engine as the other object stores — no separate setup.' },
+  { name: 'SFTP', desc: 'For legacy shared-host environments where files arrive over secure file transfer. Polls the remote tree on a schedule.' },
+  { name: 'Email (IMAP)', desc: 'Forward messages to a dedicated ingest address — attachments are added to the library automatically, scoped by the sender\u2019s domain.' },
 ];
 
 const FEATURES = [
   {
     icon: RefreshCw,
     title: 'Incremental sync',
-    body: 'Tracks last_synced_at per connector; only fetches new or modified files. Detects deletions (configurable: keep or remove).',
+    body: 'Seekra tracks what has already been ingested and only fetches new or modified files. Changes to a source file are detected and pulled in on the next sync cycle.',
   },
   {
     icon: GitBranch,
-    title: 'Versioning on conflict',
-    body: 'When a source file is modified, Seekra creates a new version (Brief #39). If the Seekra copy was also edited, a CONNECTOR_CONFLICT audit event is emitted for review.',
+    title: 'Versioning on change',
+    body: 'When a source file is modified, Seekra creates a new version of the document — the previous version is preserved. If the Seekra copy was also edited, a conflict is flagged for review.',
   },
   {
     icon: FolderSync,
-    title: 'Path-rule inference',
-    body: 'Glob patterns map source paths to org-tree nodes + classification. /Films/Production/** → Films · Production team, Confidential. Per-connector rules; first match wins.',
+    title: 'Automatic scoping',
+    body: 'Folder paths in the source map to your organization tree. A file in "/Finance/Reports/" is automatically scoped to the Finance team — no manual classification step.',
   },
   {
     icon: ShieldAlert,
-    title: 'Permission-scoped',
-    body: 'Every connector inherits the admin\u2019s tenant. Sync tasks enforce the same access rules as interactive users — no privilege escalation through connectors.',
+    title: 'Respects access control',
+    body: 'Connectors run with administrator privileges for ingestion, but the documents they pull in are still subject to the same org-tree scoping and classification rules as any other document.',
   },
-] as const;
+];
 
 export function Connectors() {
   return (
@@ -42,14 +42,14 @@ export function Connectors() {
       <div className="mx-auto max-w-7xl px-6 lg:px-10">
         <Reveal className="max-w-4xl mb-12 lg:mb-16">
           <div className="seekra-eyebrow-ink mb-3">
-            Data Connectors · Brief #32
+            Data Connectors
           </div>
           <h2 className="font-bold tracking-tight text-[#1F1A14]"
               style={{ fontSize: 'clamp(28px, 4vw, 44px)', lineHeight: 1.15, letterSpacing: '-0.02em' }}>
-            Point Seekra at your SharePoint. We&rsquo;ll have it indexed by morning<span className="text-[#B93C32]">.</span>
+            Point Seekra at where your documents already live<span className="text-[#B93C32]">.</span>
           </h2>
           <p className="mt-4 text-[16px] leading-[1.6] text-[#4A3F33] max-w-[880px]">
-            The #1 onboarding blocker for enterprise content AI is "how do I get my 50,000 documents in?" — without connectors, the answer is "manually, one at a time." Seekra&rsquo;s connector framework pulls from 9 data sources automatically, with incremental sync, conflict resolution, and per-connector scope inference.
+            The most common question after a demo is &ldquo;how do I get my tens of thousands of documents in?&rdquo; — and the answer used to be &ldquo;manually, one at a time.&rdquo; Seekra&rsquo;s connector framework pulls from nine data sources automatically, with incremental sync, conflict resolution, and automatic scoping based on the folder structure you already have.
           </p>
         </Reveal>
 
@@ -70,7 +70,7 @@ export function Connectors() {
                   </h3>
                   {c.featured && (
                     <span className="text-[10px] font-bold tracking-[0.14em] uppercase text-[#B59876]">
-                      Demo-ready
+                      Easiest start
                     </span>
                   )}
                 </div>
@@ -111,7 +111,7 @@ export function Connectors() {
 
         <Reveal delay={200}>
           <p className="mt-8 text-[14px] leading-[1.6] text-[#4A3F33] max-w-[720px]">
-            <span className="font-semibold text-[#1F1A14]">The killer demo moment:</span> during a live demo, drop a file on the watched /ingest/ folder — within 60 seconds, it appears in the Seekra library with the correct scope + classification, fully indexed and searchable. No manual upload, no IT ticket.
+            <span className="font-semibold text-[#1F1A14]">In practice:</span> a typical enterprise onboarding starts with one connector pointed at a shared drive or SharePoint site. Within a sync cycle, the library is populated, scoped, and searchable. Additional connectors are added as more teams come on board.
           </p>
         </Reveal>
       </div>

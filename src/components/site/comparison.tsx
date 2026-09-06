@@ -18,26 +18,26 @@ const ROWS: Row[] = [
   { feature: 'Cross-scope override grants (without elevating clearance)', seekra: 'yes', cloud: 'no', legacy: 'no' },
   // Connectors
   { feature: '9 data connectors (SharePoint, Drive, S3, Azure, GCS, SFTP, OSS, IMAP, local)', seekra: 'yes', cloud: 'partial', legacy: 'partial' },
-  { feature: 'Local folder auto-ingest (drop file → indexed in 60s)', seekra: 'yes', cloud: 'no', legacy: 'partial' },
+  { feature: 'Local folder auto-ingest (drop file → indexed automatically)', seekra: 'yes', cloud: 'no', legacy: 'partial' },
   { feature: 'Source-side conflict resolution + versioning', seekra: 'yes', cloud: 'no', legacy: 'no' },
   // Intelligence
   { feature: 'Natural-language Q&A with page-level citations', seekra: 'yes', cloud: 'yes', legacy: 'no' },
-  { feature: 'Agent mode (multi-step planner + 5 permission-scoped tools)', seekra: 'yes', cloud: 'partial', legacy: 'no' },
-  { feature: 'Deep answer mode (decompose + multi-pass synthesis)', seekra: 'yes', cloud: 'partial', legacy: 'no' },
-  { feature: 'Auto-extracted entity knowledge graph (Arabic + English NER)', seekra: 'yes', cloud: 'partial', legacy: 'no' },
+  { feature: 'Agent mode (multi-step research using internal tools)', seekra: 'yes', cloud: 'partial', legacy: 'no' },
+  { feature: 'Deep answer mode (multi-pass research for complex questions)', seekra: 'yes', cloud: 'partial', legacy: 'no' },
+  { feature: 'Auto-extracted entity knowledge graph (Arabic + English)', seekra: 'yes', cloud: 'partial', legacy: 'no' },
   { feature: 'Visual / image search', seekra: 'yes', cloud: 'partial', legacy: 'no' },
   { feature: 'Voice-driven document navigation (Arabic + English)', seekra: 'yes', cloud: 'partial', legacy: 'no' },
   // Governance
-  { feature: 'PII masked at source (before LLM sees content)', seekra: 'yes', cloud: 'partial', legacy: 'yes' },
+  { feature: 'PII masked at source (before any AI call)', seekra: 'yes', cloud: 'partial', legacy: 'yes' },
   { feature: 'PII lineage tracking (prove no raw PII left tenant)', seekra: 'yes', cloud: 'no', legacy: 'partial' },
   { feature: 'Tamper-evident audit trail (hash-chained)', seekra: 'yes', cloud: 'no', legacy: 'partial' },
   { feature: 'Provenance graph (full answer traceability)', seekra: 'yes', cloud: 'partial', legacy: 'no' },
-  { feature: 'Confidence-aware answers (per-chunk scores)', seekra: 'yes', cloud: 'partial', legacy: 'no' },
+  { feature: 'Confidence-aware answers (relevance scores per source)', seekra: 'yes', cloud: 'partial', legacy: 'no' },
   { feature: 'Document version diff', seekra: 'yes', cloud: 'no', legacy: 'partial' },
   { feature: 'Abstention rather than hallucination', seekra: 'yes', cloud: 'partial', legacy: 'yes' },
   // Identity
-  { feature: 'SSO / SCIM integration (Azure AD, Google Workspace)', seekra: 'partial', cloud: 'yes', legacy: 'partial' },
-  { feature: 'Soft-delete users with instant token invalidation', seekra: 'yes', cloud: 'partial', legacy: 'yes' },
+  { feature: 'Single sign-on + automated user provisioning (Azure AD, Google Workspace)', seekra: 'partial', cloud: 'yes', legacy: 'partial' },
+  { feature: 'Offboard employees with immediate access revocation', seekra: 'yes', cloud: 'partial', legacy: 'yes' },
 ];
 
 function Cell({ value }: { value: Status }) {

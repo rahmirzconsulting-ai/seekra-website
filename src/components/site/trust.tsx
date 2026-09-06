@@ -15,12 +15,12 @@ const SECURITY_CARDS = [
   {
     icon: ShieldCheck,
     title: 'Tamper-evident audit trail',
-    body: 'Every action is hash-chained. Any retroactive edit breaks the chain — detectable on demand via the admin API.',
+    body: 'Every action is recorded and hash-chained. Any retroactive edit breaks the chain — detectable on demand from the admin console.',
   },
   {
     icon: ScrollText,
     title: 'Full audit logging + provenance',
-    body: 'Trace any answer to its source chunk, its PII findings, and the LLM calls that received the masked version.',
+    body: 'Trace any answer to its source document, the personal-data findings, and the AI calls that received the masked version.',
   },
 ] as const;
 

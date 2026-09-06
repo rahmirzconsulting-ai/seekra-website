@@ -10,7 +10,6 @@ const TIERS = [
     featured: false,
     connectors: 'All 9 connectors',
     sso: 'Azure AD, Google Workspace, Keycloak',
-    saas: 'Multi-tenant SaaS-ready',
   },
   {
     tier: 'Tier 02 · Sovereign',
@@ -20,7 +19,6 @@ const TIERS = [
     featured: false,
     connectors: 'All 9 connectors',
     sso: 'Azure AD, Google Workspace, Keycloak',
-    saas: 'Single-tenant only',
   },
   {
     tier: 'Tier 03 · Maximum Security',
@@ -29,21 +27,20 @@ const TIERS = [
     icon: Lock,
     featured: true,
     connectors: 'Local folder + SFTP only',
-    sso: 'OIDC via on-prem IdP',
-    saas: 'Single-tenant only',
+    sso: 'On-prem identity provider',
   },
-] as const;
+];
 
 const PLATFORM_FEATURES = [
   {
     icon: KeyRound,
-    title: 'SSO / SCIM (Brief #33, in progress)',
-    body: 'OIDC integration with Azure AD, Google Workspace, and Keycloak. Just-in-time provisioning + group-to-role mapping + SCIM 2.0 for automated offboard. Fallback local login for break-glass admins.',
+    title: 'Single sign-on (SSO)',
+    body: 'Single sign-on integration with Azure AD, Google Workspace, and Keycloak. New hires are provisioned automatically based on their identity-provider group membership; offboards propagate within minutes. A fallback local login is available for break-glass administrators.',
   },
   {
     icon: Building2,
-    title: 'Multi-tenant SaaS-ready (roadmap)',
-    body: 'Schema-per-tenant isolation. Per-tenant branding, LLM keys, retention policies. Cross-tenant super-admin console. Currently single-tenant; multi-tenant lands when 3+ customers request it.',
+    title: 'Per-tenant configuration',
+    body: 'Branding (logo, colors, custom domain), AI provider keys, retention policies, and classification labels can be configured per tenant. Suitable for holding companies with multiple subsidiaries.',
   },
 ];
 
@@ -60,7 +57,7 @@ export function Deployment() {
             Three tiers. One platform. You choose<span className="text-[#B93C32]">.</span>
           </h2>
           <p className="mt-4 text-[16px] leading-[1.6] text-[#4A3F33] max-w-[880px]">
-            Seekra runs in three deployment tiers — from cloud-native to fully air-gapped — so you choose exactly where the AI runs and how isolated your environment is. The platform stays the same; only the AI location and network exposure change. All three tiers support SSO, connectors, and the full feature set.
+            Seekra runs in three deployment tiers — from cloud-native to fully air-gapped — so you choose exactly where the AI runs and how isolated your environment is. The platform stays the same; only the AI location and network exposure change. All three tiers support single sign-on and the full feature set.
           </p>
         </Reveal>
 
@@ -137,9 +134,6 @@ export function Deployment() {
                       <div className={`text-[11px] ${tier.featured ? 'text-[#E7E6E4]/65' : 'text-[#4A3F33]'}`}>
                         <span className="font-semibold tracking-tight">SSO:</span> {tier.sso}
                       </div>
-                      <div className={`text-[11px] ${tier.featured ? 'text-[#E7E6E4]/65' : 'text-[#4A3F33]'}`}>
-                        <span className="font-semibold tracking-tight">SaaS:</span> {tier.saas}
-                      </div>
                     </div>
 
                     {/* Tier label */}
@@ -153,7 +147,7 @@ export function Deployment() {
           })}
         </div>
 
-        {/* Platform features (SSO + multi-tenant) */}
+        {/* Platform features (SSO + per-tenant config) */}
         <div className="mt-10 grid md:grid-cols-2 gap-5">
           {PLATFORM_FEATURES.map((f, i) => {
             const Icon = f.icon;

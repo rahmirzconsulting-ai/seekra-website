@@ -13,10 +13,10 @@ export function Footer() {
             </span>
             <div>
               <div className="text-[13px] font-semibold text-[#B59876] tracking-tight">
-                New: Data Connectors + Enterprise Access Control
+                New: Data connectors + enterprise access control
               </div>
               <div className="text-[11px] text-[#E7E6E4]/65 mt-0.5">
-                9 connector types · org-tree scoping · 4-level classification · per-user clearance · request a demo to see them live
+                9 data source connectors · organization-tree scoping · 4-level classification · request a demo to see them live
               </div>
             </div>
           </div>

@@ -1,143 +1,113 @@
 import { Navbar } from '@/components/site/navbar';
 import { Footer } from '@/components/site/footer';
 
-type Brief = {
+type Release = {
   id: string;
   title: string;
   date: string;
-  category: 'Access Control' | 'Connectors' | 'Intelligence' | 'Governance' | 'UX' | 'Platform';
+  category: 'Access Control' | 'Connectors' | 'Intelligence' | 'Governance' | 'User Experience';
   summary: string;
   details: string[];
 };
 
-const BRIEFS: Brief[] = [
+const RELEASES: Release[] = [
   // Latest first
   {
-    id: '#32',
-    title: 'Data Connectors + Bulk Folder Ingestion',
-    date: 'Aug 2026',
+    id: '2026.09',
+    title: 'Data connectors',
+    date: 'September 2026',
     category: 'Connectors',
-    summary: '9 connector types (local folder, SharePoint, Google Drive, AWS S3, Azure Blob, GCS, SFTP, Alibaba OSS, IMAP) with incremental sync, versioning on conflict, and per-connector scope inference.',
+    summary: 'Nine data source connectors with incremental sync, automatic scoping, and versioning on change. Point Seekra at where your documents already live and the library populates itself.',
     details: [
-      'Pluggable Connector ABC with list_changes / stream_bytes / infer_scope',
-      'Path-rule inference: glob pattern → (scope_org_id, classification)',
-      'Conflict resolution via Brief #39 versioning',
-      'Permission-scoped: connectors inherit admin tenant, enforce same access rules',
-      'Async sync via Celery beat (default 5 min interval, configurable per connector)',
+      'Connectors for local/network folders, SharePoint, Google Drive, Amazon S3, Azure Blob, Google Cloud Storage, Alibaba OSS, SFTP, and email',
+      'Incremental sync — only new or modified files are fetched',
+      'Folder paths map to your organization tree, so documents are scoped automatically',
+      'When a source file changes, a new version is created — the previous version is preserved',
     ],
   },
   {
-    id: '#31',
-    title: 'Noun-anchored inventory count regex (EN + AR)',
-    date: 'Aug 2026',
+    id: '2026.08',
+    title: 'Three answer modes',
+    date: 'August 2026',
     category: 'Intelligence',
-    summary: 'Fixed a regression where "how many PDF documents" missed the deterministic SQL inventory path and the LLM hallucinated a count from a few retrieved excerpts. The new regex tolerates qualifier words but requires the document/file noun.',
+    summary: 'Standard, agent, and deep answer modes plus an entity knowledge graph that understands people, organizations, and locations in your documents — in Arabic and English.',
     details: [
-      'Tolerates up to 3 qualifier words between "how many" and "documents/files"',
-      'Requires the noun, so "how many days of leave" still falls through to retrieval',
-      'Bilingual: Arabic regex covers كم عدد ملفات PDF phrasings',
+      'Standard mode — fast single-pass answers for most questions',
+      'Agent mode — multi-step research using a small set of internal tools (search, list, summarize, find entities, compare)',
+      'Deep mode — comprehensive multi-pass synthesis for complex questions that span many documents',
+      'Auto-extracted entity knowledge graph — no manual tagging required',
     ],
   },
   {
-    id: '#20–#24',
-    title: 'Agent mode + Deep answer mode + calm UX',
-    date: 'Aug 2026',
-    category: 'Intelligence',
-    summary: 'Three answer modes (Auto / Agent / Deep) with a segmented mode pill. Agent mode: planner picks from 5 permission-scoped tools (search_library, list_documents, summarize_document, find_entity, compare_documents). Deep mode: decompose into 2–4 sub-questions, multi-pass retrieval with cross-pass chunk ranking.',
-    details: [
-      'Brief #20: planner + 5 tools + steps trace + fail-open fallback',
-      'Brief #21: deep answer mode, 9000-char context budget (vs 6000 normal)',
-      'Brief #22: citation dedup ([1][1] → [1])',
-      'Brief #23: exact-count rule in synthesis prompt (no hallucinated counts)',
-      'Brief #24: segmented mode pill, + menu, lens icon, card drop target',
-    ],
-  },
-  {
-    id: '#17 P1–P6',
-    title: 'Enterprise Access Control',
-    date: 'Aug 2026',
+    id: '2026.08',
+    title: 'Enterprise access control',
+    date: 'August 2026',
     category: 'Access Control',
-    summary: 'A 4-company org tree with ltree materialized paths. Document scoping + 4-level classification (Public/Internal/Confidential/Restricted). Per-user clearance. Cross-scope overrides that don\'t elevate clearance. Soft-delete users with instant token invalidation. Override cache flush.',
+    summary: 'Organization tree with four-level document classification and per-user clearance. Cross-scope overrides for collaboration. Offboard employees with immediate session invalidation.',
     details: [
-      'P1–P3: org_nodes (ltree) + user_org_memberships + document_overrides tables',
-      'P4: override API + Manage Access UI + classification badges',
-      'P5: retire Collections UI (replaced by org-scope + classification)',
-      'P6: soft-delete users, override cache flush, viewer chips, nginx cache headers',
-      'Permission enforcement at the SQL query layer (defense in depth)',
+      'Organization tree of companies, departments, and teams — access flows down the tree, never sideways',
+      'Four classification levels: Public, Internal, Confidential, Restricted',
+      'Per-user clearance — each user sees only documents at or below their level',
+      'Cross-scope overrides grant access to a specific document without elevating clearance',
+      'Deactivating a user rejects their existing sessions immediately',
     ],
   },
   {
-    id: '#16',
-    title: 'Entity extraction + relationship graph',
-    date: 'Aug 2026',
-    category: 'Intelligence',
-    summary: 'Persons, organizations, and locations extracted at indexing time (Brief #16.1). Cross-reference resolution finds defining chunks for mentioned references (Brief #16.5). Entity relationship graph with edge table + deterministic inference (Brief #16.4). Graph-enriched chat with entity neighborhood context (Brief #16.5).',
-    details: [
-      'Arabic NER via CAMeL Tools (Brief #15.1)',
-      'PII detection integrated with Arabic NER (Brief #15.2)',
-      'NER integrated into entity extraction (Brief #15.3)',
-      'Edge inference: CO_OCCURS, MENTIONED_IN, DIRECTED_BY, PRODUCED_BY',
-      'Admin UI: /admin/entities with force-directed graph visualization',
-    ],
-  },
-  {
-    id: '#25–#30',
-    title: 'Chat UX polish + viewer media teardown',
-    date: 'Aug 2026',
-    category: 'UX',
-    summary: 'Scroll arrows on chat + search result lists. Viewer media teardown (pause on unmount + on document switch). pdf.js canvas leak fix (measurement canvases on body cleaned up).',
-    details: [
-      'Brief #25: chat scroll arrows',
-      'Brief #26: viewer pauses media on document switch',
-      'Brief #28: pdf.js measurement canvas leak fix',
-      'Brief #29: chat + search scroll arrow polish',
-      'Brief #30: search results scroll arrows',
-    ],
-  },
-  {
-    id: 'P14–P16',
-    title: 'Audit chain advisory lock + PII lineage',
-    date: 'Aug 2026',
+    id: '2026.08',
+    title: 'Audit chain hardening + PII lineage',
+    date: 'August 2026',
     category: 'Governance',
-    summary: 'Advisory lock on audit chain writes (fixes prev_hash race on concurrent events). PII lineage summary header on Document Provenance page. Aggregate duplicate PII findings with match_count + xN badge for repeated matches.',
+    summary: 'Tamper-evident audit chain made safe under concurrent writes. PII lineage summary surfaces repeated findings at a glance, with masked samples for regulator review.',
     details: [
-      'P14: pg_advisory_xact_lock prevents prev_hash race',
-      'P15: PII lineage summary on /admin/provenance/{doc_id}',
-      'P16: match_count aggregation, distinguishing Emirates-ID mask, legacy lineage compat',
+      'Concurrent audit writes no longer risk breaking the hash chain',
+      'PII findings aggregated by masked sample — repeated matches shown with a count badge',
+      'PII lineage summary on each document\u2019s provenance page',
     ],
   },
   {
-    id: '#18, #19',
-    title: 'Guided fallback + proactive guidance',
-    date: 'Aug 2026',
+    id: '2026.07',
+    title: 'Entity extraction + relationship graph',
+    date: 'July 2026',
     category: 'Intelligence',
-    summary: 'Guided fallback suggests closest documents on no-match (Brief #18a). Clarifying-question base prompt for ambiguous queries (Brief #18b). Scale-safe inventory via SQL COUNT/GROUP BY (Brief #18c). /chat/starters endpoint returns library-grounded starter questions (Brief #19). Follow-up suggestion chips after each chat answer (Brief #19).',
+    summary: 'People, organizations, and locations identified at indexing time. Cross-references like "this document" and "the aforementioned" resolved to the defining passage. Relationship graph with admin visualization.',
     details: [
-      '/chat/starters?lang=en returns "Summarize {latest_doc}", "What documents mention {org}?" etc.',
-      'Follow-up suggestions grounded in cited documents, not generic LLM prompts',
-      'Per-user + per-lang Redis cache (seekra:chat:starters:v1:{uid}:{lang})',
+      'Arabic and English named-entity recognition built in',
+      'Cross-reference resolution — pronouns and shorthand link back to their source',
+      'Relationship graph with admin visualization and entity-aware chat answers',
     ],
   },
   {
-    id: '#13',
-    title: 'Cross-reference resolution + entity extraction',
-    date: 'Jul 2026',
+    id: '2026.07',
+    title: 'Guided fallback + proactive suggestions',
+    date: 'July 2026',
     category: 'Intelligence',
-    summary: 'Entity extraction at indexing time (chunk_entities table). Cross-reference resolution: "this book", "it", "the aforementioned" resolves to the defining chunk for the mentioned reference.',
+    summary: 'When Seekra cannot find an answer, it suggests the closest matching documents instead of returning a dead end. The empty chat screen now shows library-grounded starter questions. Each answer is followed by suggested follow-ups.',
     details: [
-      'Chunk-level entity storage for fast scoped queries',
-      'Cross-reference resolution runs after indexing, before search',
+      'Closest-document suggestions on no-match queries',
+      'Starter questions grounded in your actual document filenames',
+      'Follow-up suggestion chips after each answer',
+    ],
+  },
+  {
+    id: '2026.07',
+    title: 'Chat and viewer polish',
+    date: 'July 2026',
+    category: 'User Experience',
+    summary: 'Scroll arrows on long result lists. Media in the document viewer pauses when switching documents or leaving the page. PDF rendering cleanup prevents memory leaks on long reading sessions.',
+    details: [
+      'Scroll arrows on chat history and search results',
+      'Viewer pauses audio and video when you navigate away',
+      'PDF rendering no longer leaks canvases on long sessions',
     ],
   },
 ];
 
-const CATEGORY_COLORS: Record<Brief['category'], string> = {
+const CATEGORY_COLORS: Record<Release['category'], string> = {
   'Access Control': '#B93C32',
   'Connectors': '#B59876',
   'Intelligence': '#4f8fdd',
   'Governance': '#5cb87a',
-  'UX': '#b45ad4',
-  'Platform': '#4A3F33',
+  'User Experience': '#b45ad4',
 };
 
 export default function ChangelogPage() {
@@ -154,33 +124,32 @@ export default function ChangelogPage() {
             What&rsquo;s new in Seekra<span className="text-[#B93C32]">.</span>
           </h1>
           <p className="text-[16px] leading-[1.6] text-[#E7E6E4]/72 mb-12 max-w-[640px]">
-            Briefs #13 through #32 — six months of focused, incremental shipping. Each brief is a self-contained scope, deployed to production, UAT-verified before merge. The most recent is at the top.
+            Recent capability releases, in reverse chronological order. Each release is deployed to production and verified before it ships.
           </p>
 
           <div className="space-y-8">
-            {BRIEFS.map((b) => (
+            {RELEASES.map((r) => (
               <article
-                key={b.id}
+                key={r.id + r.title}
                 className="bg-[#E7E6E4]/[0.04] border border-[#E7E6E4]/15 rounded-[14px] p-7"
               >
                 <div className="flex items-center gap-3 mb-3 flex-wrap">
                   <span
                     className="text-[10px] font-bold tracking-[0.14em] uppercase px-2.5 py-1 rounded-full text-white"
-                    style={{ background: CATEGORY_COLORS[b.category] }}
+                    style={{ background: CATEGORY_COLORS[r.category] }}
                   >
-                    {b.category}
+                    {r.category}
                   </span>
-                  <span className="text-[12px] font-mono text-[#B59876]">{b.id}</span>
-                  <span className="text-[12px] text-[#E7E6E4]/55">{b.date}</span>
+                  <span className="text-[12px] text-[#E7E6E4]/55">{r.date}</span>
                 </div>
                 <h2 className="text-[20px] font-semibold text-[#E7E6E4] tracking-tight mb-2">
-                  {b.title}
+                  {r.title}
                 </h2>
                 <p className="text-[14px] leading-[1.65] text-[#E7E6E4]/72 mb-4">
-                  {b.summary}
+                  {r.summary}
                 </p>
                 <ul className="space-y-2">
-                  {b.details.map((d, j) => (
+                  {r.details.map((d, j) => (
                     <li key={j} className="flex items-start gap-2 text-[13px] leading-[1.55] text-[#E7E6E4]/85">
                       <span className="text-[#B59876] mt-1 flex-shrink-0">›</span>
                       <span>{d}</span>
@@ -196,7 +165,7 @@ export default function ChangelogPage() {
               Want to see these in production?
             </div>
             <div className="text-[13px] leading-[1.55] text-[#E7E6E4]/85">
-              We run a live demo at <a href="#contact" className="text-[#B59876] underline hover:text-[#C9B498]">app-internal.seekra.pk</a> with a 32-document Dubai media-holding library. Book a 45-minute walkthrough and we&rsquo;ll show you every brief above against real content.
+              Book a live demo and we&rsquo;ll walk you through every capability above against a working enterprise library — search, chat with citations, access control, connectors, governance, and the entity knowledge graph.
             </div>
           </div>
         </div>
