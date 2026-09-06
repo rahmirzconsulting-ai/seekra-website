@@ -5,8 +5,8 @@ type Status = 'yes' | 'partial' | 'no';
 type Row = {
   feature: string;
   seekra: Status;
-  cloud: Status;        // ChatGPT / Gemini / generic cloud AI
-  legacy: Status;       // Elastic / Solr / legacy enterprise search
+  cloud: Status;        // general-purpose AI assistant offered as a public service
+  legacy: Status;       // traditional keyword-based enterprise search platform
 };
 
 const ROWS: Row[] = [
@@ -36,7 +36,7 @@ const ROWS: Row[] = [
   { feature: 'Document version diff', seekra: 'yes', cloud: 'no', legacy: 'partial' },
   { feature: 'Abstention rather than hallucination', seekra: 'yes', cloud: 'partial', legacy: 'yes' },
   // Identity
-  { feature: 'Single sign-on + automated user provisioning (Azure AD, Google Workspace)', seekra: 'partial', cloud: 'yes', legacy: 'partial' },
+  { feature: 'Single sign-on + automated user provisioning (major identity providers)', seekra: 'partial', cloud: 'yes', legacy: 'partial' },
   { feature: 'Offboard employees with immediate access revocation', seekra: 'yes', cloud: 'partial', legacy: 'yes' },
 ];
 
@@ -116,7 +116,7 @@ export function Comparison() {
 
         <Reveal delay={200}>
           <p className="mt-6 text-[12px] italic text-[#4A3F33] max-w-[860px]">
-            Cloud AI = ChatGPT, Gemini, Claude, and similar general-purpose assistants. Legacy Search = Elastic, Solr, SharePoint search, and similar keyword-based enterprise search. "Partial" means the capability exists but is incomplete, requires significant configuration, or depends on a third-party integration.
+            "Cloud AI" refers to general-purpose AI assistants offered as public services. "Legacy Search" refers to traditional keyword-based enterprise search platforms. "Partial" indicates that a capability is available but may require additional configuration, partner integration, or addresses the requirement only in part.
           </p>
         </Reveal>
       </div>

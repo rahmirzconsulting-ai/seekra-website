@@ -5,11 +5,11 @@ const TIERS = [
   {
     tier: 'Tier 01 · Fastest',
     title: 'Cloud Native',
-    body: 'Seekra runs in your cloud tenant and can leverage industry-leading external AI models — ChatGPT, Gemini, Claude — with PII automatically masked before any external call. Best AI capability, fastest to deploy.',
+    body: 'Seekra runs in your cloud tenant and can leverage industry-leading external AI models, with PII automatically masked before any external call. Best AI capability, fastest to deploy.',
     icon: Cloud,
     featured: false,
     connectors: 'All 9 connectors',
-    sso: 'Azure AD, Google Workspace, Keycloak',
+    sso: 'Major cloud identity providers + on-prem',
   },
   {
     tier: 'Tier 02 · Sovereign',
@@ -18,7 +18,7 @@ const TIERS = [
     icon: Server,
     featured: false,
     connectors: 'All 9 connectors',
-    sso: 'Azure AD, Google Workspace, Keycloak',
+    sso: 'Major cloud identity providers + on-prem',
   },
   {
     tier: 'Tier 03 · Maximum Security',
@@ -35,7 +35,7 @@ const PLATFORM_FEATURES = [
   {
     icon: KeyRound,
     title: 'Single sign-on (SSO)',
-    body: 'Single sign-on integration with Azure AD, Google Workspace, and Keycloak. New hires are provisioned automatically based on their identity-provider group membership; offboards propagate within minutes. A fallback local login is available for break-glass administrators.',
+    body: 'Single sign-on integration with major cloud and on-premises identity providers. New hires are provisioned automatically based on their identity-provider group membership; offboards propagate within minutes. A fallback local login is available for break-glass administrators.',
   },
   {
     icon: Building2,
