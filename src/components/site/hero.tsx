@@ -26,6 +26,20 @@ const SCENES = [
     render: () => <SpeakScene />,
   },
   {
+    id: 'connectors',
+    label: 'Connectors — SharePoint, Drive, S3, SFTP',
+    pill: 'Connect',
+    caption: '9 data sources · auto-ingest',
+    render: () => <ConnectorsScene />,
+  },
+  {
+    id: 'access',
+    label: 'Access Control — org tree + 4-level classification',
+    pill: 'Control',
+    caption: 'Org-tree scoping · clearance levels',
+    render: () => <AccessControlScene />,
+  },
+  {
     id: 'trust',
     label: 'Trust — nothing leaves the box',
     pill: 'Trust',
@@ -85,8 +99,17 @@ export function Hero() {
 
           {/* Hero subline — punchier, names specific document types, states the core feature */}
           <p className="mt-6 text-[16px] lg:text-[18px] leading-[1.6] text-[#E7E6E4]/78 max-w-[600px]">
-            Upload your contracts, policies, case files, and scans — Seekra turns them into a private assistant you can <span className="text-[#E7E6E4] font-medium">ask</span>, <span className="text-[#E7E6E4] font-medium">search by image</span>, or <span className="text-[#E7E6E4] font-medium">speak to</span> in Arabic or English. Every answer cited to its source, every PII masked, every action auditable.
+            Connect Seekra to your SharePoint, Google Drive, or network share — and your contracts, policies, case files, and scans become a private assistant you can <span className="text-[#E7E6E4] font-medium">ask</span>, <span className="text-[#E7E6E4] font-medium">search by image</span>, or <span className="text-[#E7E6E4] font-medium">speak to</span> in Arabic or English. Every answer cited to its source, every PII masked, every action auditable, every document scoped to your org tree.
           </p>
+
+          {/* Live demo badge */}
+          <div className="mt-5 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[12px] font-medium bg-[#B59876]/10 border border-[#B59876]/30 text-[#B59876]">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#B59876] opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#B59876]"></span>
+            </span>
+            Live demo running — see real answers from a 32-document Dubai media-holding library
+          </div>
 
           {/* Floating glass chips — reduced to 2 trust signals not already in the subline */}
           <div className="mt-7 flex flex-wrap gap-2.5">
@@ -340,6 +363,110 @@ function TrustScene() {
             <span className="text-[12px] font-medium text-[#E7E6E4]">{item.label}</span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Scene 5 — Connectors (data sources)
+   ───────────────────────────────────────────────────────────── */
+function ConnectorsScene() {
+  const sources = [
+    { name: 'SharePoint', icon: 'S' },
+    { name: 'Google Drive', icon: 'D' },
+    { name: 'AWS S3', icon: ' bucket' },
+    { name: 'Azure Blob', icon: 'B' },
+    { name: 'GCS', icon: 'G' },
+    { name: 'SFTP', icon: 'F' },
+    { name: 'Alibaba OSS', icon: 'A' },
+    { name: 'IMAP', icon: 'M' },
+    { name: 'Local folder', icon: '/' },
+  ];
+  return (
+    <div className="p-5 lg:p-6 h-full overflow-hidden bg-[#F5F4F2]">
+      <div className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#4A3F33] mb-2">
+        9 data connectors
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {sources.map((src, i) => (
+          <div
+            key={i}
+            className="flex items-center gap-2 px-2.5 py-2 rounded-[8px] bg-white border border-black/[0.08]"
+          >
+            <span className="w-6 h-6 rounded-[6px] bg-[#B59876]/15 flex items-center justify-center text-[11px] font-bold text-[#B59876] flex-shrink-0">
+              {src.icon.trim().charAt(0) || '/'}
+            </span>
+            <span className="text-[11px] font-medium text-[#1F1A14] truncate">{src.name}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 p-3 rounded-[8px] bg-[#B59876]/[0.08] border border-[#B59876]/30">
+        <div className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#B59876] mb-1.5">
+          Auto-ingest
+        </div>
+        <div className="text-[11px] leading-[1.5] text-[#1F1A14]">
+          Drop files in /ingest/ → indexed in 60s. SharePoint changes → versioned automatically. No manual upload.
+        </div>
+      </div>
+      <div className="mt-3 flex items-center gap-1.5 text-[10px] text-[#4A3F33]">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#5cb87a]"></span>
+        <span>Synced 2 min ago · 1,247 files</span>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Scene 6 — Access Control (org tree + classification)
+   ───────────────────────────────────────────────────────────── */
+function AccessControlScene() {
+  const tree = [
+    { name: 'Seekra Holdings', depth: 0, count: '32 docs' },
+    { name: 'Group Executive', depth: 1, count: '4 docs', cls: 'Internal' },
+    { name: 'Group Finance', depth: 1, count: '3 docs', cls: 'Restricted' },
+    { name: 'Seekra Films', depth: 1, count: '10 docs' },
+    { name: 'Films · Production', depth: 2, count: '4 docs', cls: 'Confidential' },
+    { name: 'Seekra Creative', depth: 1, count: '5 docs' },
+  ];
+  const clsColors: Record<string, string> = {
+    'Public': '#5cb87a',
+    'Internal': '#4f8fdd',
+    'Confidential': '#e0764f',
+    'Restricted': '#B93C32',
+  };
+  return (
+    <div className="p-5 lg:p-6 h-full overflow-hidden bg-[#F5F4F2]">
+      <div className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#4A3F33] mb-2">
+        Org-tree access control
+      </div>
+      <div className="space-y-1">
+        {tree.map((node, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-between px-2.5 py-1.5 rounded-[6px] bg-white border border-black/[0.06]"
+            style={{ marginLeft: `${node.depth * 12}px` }}
+          >
+            <div className="flex items-center gap-2">
+              {node.depth > 0 && <span className="text-[#B59876] text-[10px]">└</span>}
+              <span className="text-[11px] font-medium text-[#1F1A14]">{node.name}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {node.cls && (
+                <span
+                  className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white"
+                  style={{ background: clsColors[node.cls] }}
+                >
+                  {node.cls}
+                </span>
+              )}
+              <span className="text-[9px] text-[#4A3F33]">{node.count}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 text-[10px] text-[#4A3F33] leading-[1.5]">
+        <span className="font-semibold text-[#1F1A14]">Clearance:</span> viewers see only docs at or below their clearance level. A Films·Production viewer with clearance 1 cannot see the Confidential scene footage — even in their own department.
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { Cloud, Server, Lock } from 'lucide-react';
+import { Cloud, Server, Lock, KeyRound, Building2 } from 'lucide-react';
 import { Reveal } from './reveal';
 
 const TIERS = [
@@ -8,6 +8,9 @@ const TIERS = [
     body: 'Seekra runs in your cloud tenant and can leverage industry-leading external AI models — ChatGPT, Gemini, Claude — with PII automatically masked before any external call. Best AI capability, fastest to deploy.',
     icon: Cloud,
     featured: false,
+    connectors: 'All 9 connectors',
+    sso: 'Azure AD, Google Workspace, Keycloak',
+    saas: 'Multi-tenant SaaS-ready',
   },
   {
     tier: 'Tier 02 · Sovereign',
@@ -15,6 +18,9 @@ const TIERS = [
     body: 'Seekra runs entirely on your own infrastructure — cloud VM or on-premises servers — with AI models hosted locally. Full data sovereignty. Nothing leaves your network.',
     icon: Server,
     featured: false,
+    connectors: 'All 9 connectors',
+    sso: 'Azure AD, Google Workspace, Keycloak',
+    saas: 'Single-tenant only',
   },
   {
     tier: 'Tier 03 · Maximum Security',
@@ -22,8 +28,24 @@ const TIERS = [
     body: 'Fully isolated self-hosted deployment with no external network connection. For classified, sovereign, or maximum-security workloads where even update traffic is not permitted.',
     icon: Lock,
     featured: true,
+    connectors: 'Local folder + SFTP only',
+    sso: 'OIDC via on-prem IdP',
+    saas: 'Single-tenant only',
   },
 ] as const;
+
+const PLATFORM_FEATURES = [
+  {
+    icon: KeyRound,
+    title: 'SSO / SCIM (Brief #33, in progress)',
+    body: 'OIDC integration with Azure AD, Google Workspace, and Keycloak. Just-in-time provisioning + group-to-role mapping + SCIM 2.0 for automated offboard. Fallback local login for break-glass admins.',
+  },
+  {
+    icon: Building2,
+    title: 'Multi-tenant SaaS-ready (roadmap)',
+    body: 'Schema-per-tenant isolation. Per-tenant branding, LLM keys, retention policies. Cross-tenant super-admin console. Currently single-tenant; multi-tenant lands when 3+ customers request it.',
+  },
+];
 
 export function Deployment() {
   return (
@@ -38,7 +60,7 @@ export function Deployment() {
             Three tiers. One platform. You choose<span className="text-[#B93C32]">.</span>
           </h2>
           <p className="mt-4 text-[16px] leading-[1.6] text-[#4A3F33] max-w-[880px]">
-            Seekra runs in three deployment tiers — from cloud-native to fully air-gapped — so you choose exactly where the AI runs and how isolated your environment is. The platform stays the same; only the AI location and network exposure change.
+            Seekra runs in three deployment tiers — from cloud-native to fully air-gapped — so you choose exactly where the AI runs and how isolated your environment is. The platform stays the same; only the AI location and network exposure change. All three tiers support SSO, connectors, and the full feature set.
           </p>
         </Reveal>
 
@@ -107,10 +129,47 @@ export function Deployment() {
                       {tier.body}
                     </p>
 
+                    {/* Integration badges */}
+                    <div className="mt-5 space-y-2">
+                      <div className={`text-[11px] ${tier.featured ? 'text-[#E7E6E4]/65' : 'text-[#4A3F33]'}`}>
+                        <span className="font-semibold tracking-tight">Connectors:</span> {tier.connectors}
+                      </div>
+                      <div className={`text-[11px] ${tier.featured ? 'text-[#E7E6E4]/65' : 'text-[#4A3F33]'}`}>
+                        <span className="font-semibold tracking-tight">SSO:</span> {tier.sso}
+                      </div>
+                      <div className={`text-[11px] ${tier.featured ? 'text-[#E7E6E4]/65' : 'text-[#4A3F33]'}`}>
+                        <span className="font-semibold tracking-tight">SaaS:</span> {tier.saas}
+                      </div>
+                    </div>
+
                     {/* Tier label */}
                     <div className="mt-6 text-[11px] font-semibold tracking-[0.18em] uppercase text-[#B59876]">
                       {tier.tier}
                     </div>
+                  </div>
+                </article>
+              </Reveal>
+            );
+          })}
+        </div>
+
+        {/* Platform features (SSO + multi-tenant) */}
+        <div className="mt-10 grid md:grid-cols-2 gap-5">
+          {PLATFORM_FEATURES.map((f, i) => {
+            const Icon = f.icon;
+            return (
+              <Reveal key={i} delay={i * 100}>
+                <article className="bg-white border border-black/[0.08] rounded-[12px] p-5 flex gap-4">
+                  <div className="w-11 h-11 rounded-[10px] bg-[#B59876]/12 flex items-center justify-center flex-shrink-0">
+                    <Icon className="w-5 h-5 text-[#B59876]" strokeWidth={1.5} />
+                  </div>
+                  <div>
+                    <h4 className="text-[15px] font-semibold text-[#1F1A14] tracking-tight mb-1">
+                      {f.title}
+                    </h4>
+                    <p className="text-[12px] leading-[1.55] text-[#4A3F33]">
+                      {f.body}
+                    </p>
                   </div>
                 </article>
               </Reveal>

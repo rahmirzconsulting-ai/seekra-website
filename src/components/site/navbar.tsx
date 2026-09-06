@@ -6,7 +6,10 @@ import { SITE_CONFIG } from '@/lib/site-config';
 
 const NAV_LINKS = [
   { href: '#capabilities', label: 'Capabilities' },
-  { href: '#security', label: 'Security' },
+  { href: '#access-control', label: 'Access Control' },
+  { href: '#connectors', label: 'Connectors' },
+  { href: '#intelligence', label: 'Intelligence' },
+  { href: '#governance', label: 'Governance' },
   { href: '#comparison', label: 'Comparison' },
   { href: '#deployment', label: 'Deployment' },
   { href: '#contact', label: 'Contact' },

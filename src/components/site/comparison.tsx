@@ -1,28 +1,46 @@
 import { Reveal } from './reveal';
 
+type Status = 'yes' | 'partial' | 'no';
+
 type Row = {
   feature: string;
-  seekra: 'yes' | 'partial';
-  cloud: 'yes' | 'partial' | 'no';
+  seekra: Status;
+  cloud: Status;        // ChatGPT / Gemini / generic cloud AI
+  legacy: Status;       // Elastic / Solr / legacy enterprise search
 };
 
 const ROWS: Row[] = [
-  { feature: 'Data residency inside your infrastructure', seekra: 'yes', cloud: 'no' },
-  { feature: 'Air-gapped / offline option', seekra: 'yes', cloud: 'no' },
-  { feature: 'PII masked at source', seekra: 'yes', cloud: 'partial' },
-  { feature: 'Page-level citations to source', seekra: 'yes', cloud: 'partial' },
-  { feature: 'Visual / image search', seekra: 'yes', cloud: 'partial' },
-  { feature: 'Arabic voice (first-class)', seekra: 'yes', cloud: 'partial' },
-  { feature: 'Offline operation', seekra: 'yes', cloud: 'no' },
-  { feature: 'Tamper-evident audit trail (hash-chained)', seekra: 'yes', cloud: 'no' },
-  { feature: 'PII lineage tracking (provable)', seekra: 'yes', cloud: 'no' },
-  { feature: 'Provenance graph (answer traceability)', seekra: 'yes', cloud: 'partial' },
-  { feature: 'Confidence-aware answers', seekra: 'yes', cloud: 'partial' },
-  { feature: 'Document version diff', seekra: 'yes', cloud: 'no' },
-  { feature: 'Voice-driven document navigation', seekra: 'yes', cloud: 'no' },
+  // Access control
+  { feature: 'Data residency inside your infrastructure', seekra: 'yes', cloud: 'no', legacy: 'yes' },
+  { feature: 'Air-gapped / offline option', seekra: 'yes', cloud: 'no', legacy: 'yes' },
+  { feature: 'Org-tree scoped access (company/department/team)', seekra: 'yes', cloud: 'no', legacy: 'partial' },
+  { feature: '4-level document classification + per-user clearance', seekra: 'yes', cloud: 'no', legacy: 'partial' },
+  { feature: 'Cross-scope override grants (without elevating clearance)', seekra: 'yes', cloud: 'no', legacy: 'no' },
+  // Connectors
+  { feature: '9 data connectors (SharePoint, Drive, S3, Azure, GCS, SFTP, OSS, IMAP, local)', seekra: 'yes', cloud: 'partial', legacy: 'partial' },
+  { feature: 'Local folder auto-ingest (drop file → indexed in 60s)', seekra: 'yes', cloud: 'no', legacy: 'partial' },
+  { feature: 'Source-side conflict resolution + versioning', seekra: 'yes', cloud: 'no', legacy: 'no' },
+  // Intelligence
+  { feature: 'Natural-language Q&A with page-level citations', seekra: 'yes', cloud: 'yes', legacy: 'no' },
+  { feature: 'Agent mode (multi-step planner + 5 permission-scoped tools)', seekra: 'yes', cloud: 'partial', legacy: 'no' },
+  { feature: 'Deep answer mode (decompose + multi-pass synthesis)', seekra: 'yes', cloud: 'partial', legacy: 'no' },
+  { feature: 'Auto-extracted entity knowledge graph (Arabic + English NER)', seekra: 'yes', cloud: 'partial', legacy: 'no' },
+  { feature: 'Visual / image search', seekra: 'yes', cloud: 'partial', legacy: 'no' },
+  { feature: 'Voice-driven document navigation (Arabic + English)', seekra: 'yes', cloud: 'partial', legacy: 'no' },
+  // Governance
+  { feature: 'PII masked at source (before LLM sees content)', seekra: 'yes', cloud: 'partial', legacy: 'yes' },
+  { feature: 'PII lineage tracking (prove no raw PII left tenant)', seekra: 'yes', cloud: 'no', legacy: 'partial' },
+  { feature: 'Tamper-evident audit trail (hash-chained)', seekra: 'yes', cloud: 'no', legacy: 'partial' },
+  { feature: 'Provenance graph (full answer traceability)', seekra: 'yes', cloud: 'partial', legacy: 'no' },
+  { feature: 'Confidence-aware answers (per-chunk scores)', seekra: 'yes', cloud: 'partial', legacy: 'no' },
+  { feature: 'Document version diff', seekra: 'yes', cloud: 'no', legacy: 'partial' },
+  { feature: 'Abstention rather than hallucination', seekra: 'yes', cloud: 'partial', legacy: 'yes' },
+  // Identity
+  { feature: 'SSO / SCIM integration (Azure AD, Google Workspace)', seekra: 'partial', cloud: 'yes', legacy: 'partial' },
+  { feature: 'Soft-delete users with instant token invalidation', seekra: 'yes', cloud: 'partial', legacy: 'yes' },
 ];
 
-function Status({ value }: { value: Row['seekra'] | Row['cloud'] }) {
+function Cell({ value }: { value: Status }) {
   if (value === 'yes') {
     return <span className="text-[#B59876] font-semibold">✓ Yes</span>;
   }
@@ -42,10 +60,10 @@ export function Comparison() {
           </div>
           <h2 className="font-bold tracking-tight text-[#1F1A14]"
               style={{ fontSize: 'clamp(28px, 4vw, 42px)', lineHeight: 1.15, letterSpacing: '-0.02em' }}>
-            An honest comparison<span className="text-[#B93C32]">.</span>
+            Three-way comparison<span className="text-[#B93C32]">.</span>
           </h2>
           <p className="mt-4 text-[16px] leading-[1.55] text-[#4A3F33] max-w-[880px]">
-            Cloud AI assistants are strong for general-purpose work. The comparison below concerns enterprise data handling — where Seekra is purpose-built.
+            Cloud AI (ChatGPT, Gemini) is strong for general-purpose work but fails on data residency and access control. Legacy enterprise search (Elastic, Solr) is strong on residency but offers no AI. Seekra is purpose-built for the gap between them — Gulf enterprise data handling with cited AI answers.
           </p>
         </Reveal>
 
@@ -57,33 +75,37 @@ export function Comparison() {
             >
               <thead>
                 <tr className="bg-[#F5F4F2] border-b border-black/[0.10]">
-                  <th className="text-left text-[11px] font-semibold tracking-[0.14em] uppercase text-[#1F1A14] px-5 py-3.5" style={{ width: '50%' }}>
+                  <th className="text-left text-[11px] font-semibold tracking-[0.14em] uppercase text-[#1F1A14] px-5 py-3.5" style={{ width: '46%' }}>
                     Capability
                   </th>
-                  <th className="text-left text-[11px] font-semibold tracking-[0.14em] uppercase text-[#1F1A14] px-5 py-3.5" style={{ width: '25%' }}>
+                  <th className="text-center text-[11px] font-semibold tracking-[0.14em] uppercase text-[#B59876] px-3 py-3.5" style={{ width: '18%' }}>
                     Seekra
                   </th>
-                  <th className="text-left text-[11px] font-semibold tracking-[0.14em] uppercase text-[#1F1A14] px-5 py-3.5" style={{ width: '25%' }}>
-                    Typical Cloud AI
+                  <th className="text-center text-[11px] font-semibold tracking-[0.14em] uppercase text-[#4A3F33] px-3 py-3.5" style={{ width: '18%' }}>
+                    Cloud AI
+                  </th>
+                  <th className="text-center text-[11px] font-semibold tracking-[0.14em] uppercase text-[#4A3F33] px-3 py-3.5" style={{ width: '18%' }}>
+                    Legacy Search
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {ROWS.map((row, i) => (
                   <tr
-                    key={row.feature}
-                    className={`border-b border-black/[0.06] last:border-0 ${
-                      i % 2 === 1 ? 'bg-black/[0.02]' : ''
-                    }`}
+                    key={i}
+                    className={`border-b border-black/[0.05] ${i % 2 === 1 ? 'bg-[#FAFAF8]' : ''}`}
                   >
-                    <td className="px-5 py-3.5 text-[14px] font-medium text-[#1F1A14]">
+                    <td className="text-[13px] text-[#1F1A14] px-5 py-3.5 leading-snug">
                       {row.feature}
                     </td>
-                    <td className="px-5 py-3.5 text-[14px]">
-                      <Status value={row.seekra} />
+                    <td className="text-center text-[13px] px-3 py-3.5">
+                      <Cell value={row.seekra} />
                     </td>
-                    <td className="px-5 py-3.5 text-[14px]">
-                      <Status value={row.cloud} />
+                    <td className="text-center text-[13px] px-3 py-3.5">
+                      <Cell value={row.cloud} />
+                    </td>
+                    <td className="text-center text-[13px] px-3 py-3.5">
+                      <Cell value={row.legacy} />
                     </td>
                   </tr>
                 ))}
@@ -92,9 +114,9 @@ export function Comparison() {
           </div>
         </Reveal>
 
-        <Reveal delay={240}>
-          <p className="mt-6 text-[12px] italic text-[#4A3F33] max-w-[1000px]">
-            Cloud AI tools are excellent generalists. This comparison concerns enterprise data handling, sovereignty, and verifiable answers — not general-purpose assistant quality.
+        <Reveal delay={200}>
+          <p className="mt-6 text-[12px] italic text-[#4A3F33] max-w-[860px]">
+            Cloud AI = ChatGPT, Gemini, Claude, and similar general-purpose assistants. Legacy Search = Elastic, Solr, SharePoint search, and similar keyword-based enterprise search. "Partial" means the capability exists but is incomplete, requires significant configuration, or depends on a third-party integration.
           </p>
         </Reveal>
       </div>
