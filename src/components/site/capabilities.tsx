@@ -41,7 +41,7 @@ const CAPABILITIES = [
       'Speech-to-text in, spoken answers out',
       'Arabic as a first-class citizen — proper RTL rendering',
       'English with full parity — not a translated afterthought',
-      'Built for the Gulf market where this combination is rare',
+      'Built for global organizations where this combination is rare',
     ],
     icon: Mic,
     visual: <SpeakVisual />,

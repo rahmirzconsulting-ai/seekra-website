@@ -39,7 +39,7 @@ export function UseCases() {
           </div>
           <h2 className="font-bold tracking-tight text-[#1F1A14]"
               style={{ fontSize: 'clamp(24px, 3.5vw, 38px)', lineHeight: 1.2, letterSpacing: '-0.02em' }}>
-            Built for the Gulf&rsquo;s most regulated sectors<span className="text-[#B93C32]">.</span>
+            Built for the world&rsquo;s most regulated sectors<span className="text-[#B93C32]">.</span>
           </h2>
         </Reveal>
 

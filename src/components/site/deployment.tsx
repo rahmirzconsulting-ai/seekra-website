@@ -1,4 +1,4 @@
-import { Cloud, Server, Lock, KeyRound, Building2 } from 'lucide-react';
+import { Cloud, Server, Lock, KeyRound } from 'lucide-react';
 import { Reveal } from './reveal';
 
 const TIERS = [
@@ -8,7 +8,7 @@ const TIERS = [
     body: 'Seekra runs in your cloud tenant and can leverage industry-leading external AI models, with PII automatically masked before any external call. Best AI capability, fastest to deploy.',
     icon: Cloud,
     featured: false,
-    connectors: 'All 9 connectors',
+    connectors: 'All connectors',
     sso: 'Major cloud identity providers + on-prem',
   },
   {
@@ -17,7 +17,7 @@ const TIERS = [
     body: 'Seekra runs entirely on your own infrastructure — cloud VM or on-premises servers — with AI models hosted locally. Full data sovereignty. Nothing leaves your network.',
     icon: Server,
     featured: false,
-    connectors: 'All 9 connectors',
+    connectors: 'All connectors',
     sso: 'Major cloud identity providers + on-prem',
   },
   {
@@ -36,11 +36,6 @@ const PLATFORM_FEATURES = [
     icon: KeyRound,
     title: 'Single sign-on (SSO)',
     body: 'Single sign-on integration with major cloud and on-premises identity providers. New hires are provisioned automatically based on their identity-provider group membership; offboards propagate within minutes. A fallback local login is available for break-glass administrators.',
-  },
-  {
-    icon: Building2,
-    title: 'Per-tenant configuration',
-    body: 'Branding (logo, colors, custom domain), AI provider keys, retention policies, and classification labels can be configured per tenant. Suitable for holding companies with multiple subsidiaries.',
   },
 ];
 
@@ -147,8 +142,8 @@ export function Deployment() {
           })}
         </div>
 
-        {/* Platform features (SSO + per-tenant config) */}
-        <div className="mt-10 grid md:grid-cols-2 gap-5">
+        {/* Platform feature: SSO */}
+        <div className="mt-10 grid md:grid-cols-1 gap-5 max-w-2xl">
           {PLATFORM_FEATURES.map((f, i) => {
             const Icon = f.icon;
             return (

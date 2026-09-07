@@ -8,7 +8,7 @@ const CONNECTORS = [
   { name: 'Amazon S3', desc: 'Sync from any S3 bucket by prefix. Resumable for large archives (tens of thousands of files).' },
   { name: 'Azure Blob Storage', desc: 'Connection-string authentication. Incremental sync detects changes via storage versioning metadata.' },
   { name: 'Google Cloud Storage', desc: 'Service-account authentication. Same incremental sync logic as Amazon S3.' },
-  { name: 'Alibaba Cloud OSS', desc: 'For China-facing tenants. Same sync engine as the other object stores — no separate setup.' },
+  { name: 'Alibaba Cloud OSS', desc: 'Same sync engine as the other object stores — no separate setup.' },
   { name: 'SFTP', desc: 'For legacy shared-host environments where files arrive over secure file transfer. Polls the remote tree on a schedule.' },
   { name: 'Email (IMAP)', desc: 'Forward messages to a dedicated ingest address — attachments are added to the library automatically, scoped by the sender\u2019s domain.' },
 ];
@@ -49,11 +49,11 @@ export function Connectors() {
             Point Seekra at where your documents already live<span className="text-[#B93C32]">.</span>
           </h2>
           <p className="mt-4 text-[16px] leading-[1.6] text-[#4A3F33] max-w-[880px]">
-            The most common question after a demo is &ldquo;how do I get my tens of thousands of documents in?&rdquo; — and the answer used to be &ldquo;manually, one at a time.&rdquo; Seekra&rsquo;s connector framework pulls from nine data sources automatically, with incremental sync, conflict resolution, and automatic scoping based on the folder structure you already have.
+            The most common question after a demo is &ldquo;how do I get my tens of thousands of documents in?&rdquo; — and the answer used to be &ldquo;manually, one at a time.&rdquo; Seekra&rsquo;s connector framework pulls from your existing document sources automatically, with incremental sync, conflict resolution, and automatic scoping based on the folder structure you already have.
           </p>
         </Reveal>
 
-        {/* 9 connectors grid */}
+        {/* Connectors grid */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
           {CONNECTORS.map((c, i) => (
             <Reveal key={c.name} delay={(i % 3) * 80}>

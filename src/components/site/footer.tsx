@@ -16,7 +16,7 @@ export function Footer() {
                 New: Data connectors + enterprise access control
               </div>
               <div className="text-[11px] text-[#E7E6E4]/65 mt-0.5">
-                9 data source connectors · organization-tree scoping · 4-level classification · request a demo to see them live
+                Connectors for major document sources · organization-tree scoping · 4-level classification · request a demo to see them live
               </div>
             </div>
           </div>
@@ -47,30 +47,6 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Anchor links — grouped, matching the navbar */}
-          <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px]">
-            <span className="text-[#E7E6E4]/40 font-medium tracking-tight mr-1">Platform</span>
-            <a href="#capabilities" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Capabilities</a>
-            <a href="#intelligence" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Intelligence</a>
-            <span className="text-[#E7E6E4]/20 mx-1">·</span>
-            <span className="text-[#E7E6E4]/40 font-medium tracking-tight mr-1">Trust</span>
-            <a href="#access-control" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Access Control</a>
-            <a href="#governance" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Governance</a>
-            <span className="text-[#E7E6E4]/20 mx-1">·</span>
-            <span className="text-[#E7E6E4]/40 font-medium tracking-tight mr-1">Connect</span>
-            <a href="#connectors" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Connectors</a>
-            <a href="#deployment" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Deployment</a>
-            <span className="text-[#E7E6E4]/20 mx-1">·</span>
-            <a href="#comparison" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Compare</a>
-            <a href="#contact" className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors">Contact</a>
-            <a
-              href={SITE_CONFIG.appBridgeUrl}
-              className="text-[#E7E6E4]/70 hover:text-[#B59876] transition-colors"
-            >
-              Launch App
-            </a>
-          </nav>
-
           {/* Email + copyright */}
           <div className="text-right text-[12px] text-[#E7E6E4]/55 leading-relaxed">
             <a
@@ -86,3 +62,4 @@ export function Footer() {
     </footer>
   );
 }
+

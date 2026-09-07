@@ -29,7 +29,7 @@ const SCENES = [
     id: 'connectors',
     label: 'Connectors — your existing document sources',
     pill: 'Connect',
-    caption: '9 data sources · auto-ingest',
+    caption: 'Multiple data sources · auto-ingest',
     render: () => <ConnectorsScene />,
   },
   {
@@ -386,7 +386,7 @@ function ConnectorsScene() {
   return (
     <div className="p-5 lg:p-6 h-full overflow-hidden bg-[#F5F4F2]">
       <div className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#4A3F33] mb-2">
-        9 data connectors
+        Data connectors
       </div>
       <div className="grid grid-cols-3 gap-2">
         {sources.map((src, i) => (

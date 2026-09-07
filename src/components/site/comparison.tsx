@@ -17,7 +17,7 @@ const ROWS: Row[] = [
   { feature: '4-level document classification + per-user clearance', seekra: 'yes', cloud: 'no', legacy: 'partial' },
   { feature: 'Cross-scope override grants (without elevating clearance)', seekra: 'yes', cloud: 'no', legacy: 'no' },
   // Connectors
-  { feature: '9 data connectors (SharePoint, Drive, S3, Azure, GCS, SFTP, OSS, IMAP, local)', seekra: 'yes', cloud: 'partial', legacy: 'partial' },
+  { feature: 'Data connectors (SharePoint, Drive, S3, Azure, GCS, SFTP, OSS, IMAP, local)', seekra: 'yes', cloud: 'partial', legacy: 'partial' },
   { feature: 'Local folder auto-ingest (drop file → indexed automatically)', seekra: 'yes', cloud: 'no', legacy: 'partial' },
   { feature: 'Source-side conflict resolution + versioning', seekra: 'yes', cloud: 'no', legacy: 'no' },
   // Intelligence

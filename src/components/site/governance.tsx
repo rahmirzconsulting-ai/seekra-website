@@ -47,7 +47,7 @@ export function Governance() {
             Every answer traceable. Every PII masked. Every action auditable. Every access scoped<span className="text-[#B93C32]">.</span>
           </h2>
           <p className="mt-4 text-[16px] leading-[1.6] text-[#E7E6E4]/65 max-w-[640px]">
-            Six governance pillars, all in production. No competitor in the Gulf enterprise AI segment offers this combination — and we can prove each one with a live audit-trail query during the demo.
+            Six governance pillars, all in production. Few platforms offer this combination — and we can prove each one with a live audit-trail query during the demo.
           </p>
         </Reveal>
 

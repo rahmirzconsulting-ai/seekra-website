@@ -26,14 +26,14 @@ export const metadata: Metadata = {
     template: "%s | Seekra",
   },
   description:
-    "Self-hosted AI document intelligence for Gulf enterprises. Ask, see, and speak to your documents — every answer cited, every PII masked, every action auditable. Arabic-first, air-gap ready.",
+    "Self-hosted AI document intelligence for the enterprise. Ask, see, and speak to your documents — every answer cited, every PII masked, every action auditable. Arabic-first, air-gap ready.",
   keywords: [
     "Seekra",
     "AI document intelligence",
     "self-hosted AI",
     "air-gapped AI",
     "Arabic AI",
-    "Gulf enterprise AI",
+    "enterprise AI",
     "data sovereignty",
     "content-aware intelligence",
     "cited AI answers",
@@ -45,8 +45,6 @@ export const metadata: Metadata = {
     "RAG",
     "retrieval augmented generation",
     "Arabic document AI",
-    "Saudi Arabia AI",
-    "UAE AI",
     "government AI",
     "compliance AI",
     "document diff",
@@ -111,7 +109,7 @@ const jsonLd = {
   applicationCategory: "BusinessApplication",
   operatingSystem: "Web",
   description:
-    "Self-hosted AI document intelligence for Gulf enterprises. Ask, see, and speak to your documents — every answer cited, every PII masked, every action auditable.",
+    "Self-hosted AI document intelligence for the enterprise. Ask, see, and speak to your documents — every answer cited, every PII masked, every action auditable.",
   url: SITE_URL,
   logo: `${SITE_URL}/logo-seekra.png`,
   offers: {

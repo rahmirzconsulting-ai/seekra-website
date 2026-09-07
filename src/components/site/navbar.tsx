@@ -36,7 +36,7 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'connect',
     label: 'Connect',
     items: [
-      { href: '#connectors', label: 'Connectors', desc: '9 data sources · auto-ingest' },
+      { href: '#connectors', label: 'Connectors', desc: 'Connect to your existing document sources' },
       { href: '#deployment', label: 'Deployment', desc: 'Cloud · self-hosted · air-gapped' },
     ],
   },
