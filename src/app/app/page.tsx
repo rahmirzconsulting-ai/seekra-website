@@ -55,6 +55,15 @@ export default function AppBridgePage() {
     return () => clearTimeout(redirectTimer);
   }, [status]);
 
+  // When status flips to 'offline', show the message briefly then auto-redirect to #contact
+  useEffect(() => {
+    if (status !== 'offline') return;
+    const redirectTimer = setTimeout(() => {
+      window.location.href = 'https://seekra.pk/#contact';
+    }, 5000); // 5 seconds — enough time to read the message
+    return () => clearTimeout(redirectTimer);
+  }, [status]);
+
   return (
     <div className="min-h-screen flex flex-col bg-[#202020] text-[#E7E6E4]">
       {/* Subtle radial tan glow top-right — matches the main site's hero */}
@@ -195,10 +204,13 @@ function OfflineState() {
       </div>
       <h1 className="font-bold tracking-tight text-[#E7E6E4] mb-5"
           style={{ fontSize: 'clamp(28px, 4.5vw, 44px)', lineHeight: 1.15, letterSpacing: '-0.025em' }}>
-        The live demo server is currently offline<span className="text-[#B93C32]">.</span>
+        The Seekra app is currently unavailable<span className="text-[#B93C32]">.</span>
       </h1>
-      <p className="text-[16px] lg:text-[17px] leading-[1.65] text-[#E7E6E4]/75 max-w-[560px] mx-auto mb-10">
-        We spin the demo server up on demand for serious evaluations — it is not always running to conserve cloud costs. Book a demo and we&rsquo;ll have a live environment ready for you within 24 hours, with sample documents and a guided walkthrough of Ask, See, Speak, and Trust.
+      <p className="text-[16px] lg:text-[17px] leading-[1.65] text-[#E7E6E4]/75 max-w-[560px] mx-auto mb-6">
+        The Seekra app is temporarily unavailable. You&rsquo;ll be redirected to our contact page in a few seconds — or click below to get there now.
+      </p>
+      <p className="text-[13px] text-[#E7E6E4]/50 mb-8">
+        Redirecting automatically in 5 seconds…
       </p>
 
       <div className="flex flex-wrap items-center justify-center gap-4">

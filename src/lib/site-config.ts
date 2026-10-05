@@ -7,9 +7,11 @@
 export const SITE_CONFIG = {
   domain: "seekra.pk",
   url: "https://seekra.pk",
-  // The actual app URL visitors are sent to via "Launch App" buttons.
-  appBridgeUrl: "https://app.seekra.pk/",
-  // The health-check URL used by the /app bridge page (kept for backward compat).
+  // "Launch App" goes through the /app bridge page, which probes app.seekra.pk
+  // for health. If live → redirect. If offline → show "unavailable" message
+  // then auto-redirect to #contact on the main site.
+  appBridgeUrl: "/app",
+  // The app URL the bridge page probes for health and redirects to when live.
   appInternalUrl: "https://app.seekra.pk",
   contactEmail: "rahmirz.consulting@gmail.com",
   // FormSubmit.co endpoint — posts form data to the contact email via AJAX.
