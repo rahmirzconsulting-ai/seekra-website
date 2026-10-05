@@ -55,15 +55,6 @@ export default function AppBridgePage() {
     return () => clearTimeout(redirectTimer);
   }, [status]);
 
-  // When status flips to 'offline', show the message briefly then redirect to /app
-  useEffect(() => {
-    if (status !== 'offline') return;
-    const redirectTimer = setTimeout(() => {
-      window.location.href = 'https://www.seekra.pk/app/';
-    }, 5000); // 5 seconds — enough time to read the message
-    return () => clearTimeout(redirectTimer);
-  }, [status]);
-
   return (
     <div className="min-h-screen flex flex-col bg-[#202020] text-[#E7E6E4]">
       {/* Subtle radial tan glow top-right — matches the main site's hero */}
@@ -206,11 +197,8 @@ function OfflineState() {
           style={{ fontSize: 'clamp(28px, 4.5vw, 44px)', lineHeight: 1.15, letterSpacing: '-0.025em' }}>
         The Seekra app is currently unavailable<span className="text-[#B93C32]">.</span>
       </h1>
-      <p className="text-[16px] lg:text-[17px] leading-[1.65] text-[#E7E6E4]/75 max-w-[560px] mx-auto mb-6">
-        The Seekra app is temporarily unavailable. You&rsquo;ll be redirected to our contact page in a few seconds — or click below to get there now.
-      </p>
-      <p className="text-[13px] text-[#E7E6E4]/50 mb-8">
-        Redirecting automatically in 5 seconds…
+      <p className="text-[16px] lg:text-[17px] leading-[1.65] text-[#E7E6E4]/75 max-w-[560px] mx-auto mb-10">
+        The Seekra app is temporarily unavailable. Book a demo and we&rsquo;ll have a live environment ready for you — or try again in a moment.
       </p>
 
       <div className="flex flex-wrap items-center justify-center gap-4">
