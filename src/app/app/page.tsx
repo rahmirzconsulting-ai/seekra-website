@@ -55,11 +55,11 @@ export default function AppBridgePage() {
     return () => clearTimeout(redirectTimer);
   }, [status]);
 
-  // When status flips to 'offline', show the message briefly then auto-redirect to #contact
+  // When status flips to 'offline', show the message briefly then redirect to /app
   useEffect(() => {
     if (status !== 'offline') return;
     const redirectTimer = setTimeout(() => {
-      window.location.href = 'https://seekra.pk/#contact';
+      window.location.href = 'https://www.seekra.pk/app/';
     }, 5000); // 5 seconds — enough time to read the message
     return () => clearTimeout(redirectTimer);
   }, [status]);
